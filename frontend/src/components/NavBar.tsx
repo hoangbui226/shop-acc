@@ -1,10 +1,6 @@
-"use client";
-
 import { useState, useRef, useEffect } from "react";
 import { Globe } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 
 const languages = [
   { code: "en", label: "English" },
@@ -14,6 +10,7 @@ const languages = [
 const NavBar = () => {
   const [langOpen, setLangOpen] = useState(false);
   const [selectedLang, setSelectedLang] = useState(languages[0]);
+  const [scrolled, setScrolled] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -27,70 +24,268 @@ const NavBar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 12);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-        
-        {/* Logo (use Next Link instead of <a>) */}
-        <Link href="/" className="text-lg font-bold text-foreground tracking-tight">
-          LimitesM2
-        </Link>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
 
-        <div className="flex items-center gap-2">
+        .navbar-root {
+          position: fixed;
+          top: 0; left: 0; right: 0;
+          z-index: 100;
+          padding: 0 0;
+          transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-          {/* Language dropdown */}
-          <div className="relative" ref={dropdownRef}>
+        .navbar-inner {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 0 28px;
+          height: 60px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .navbar-root.scrolled .navbar-inner {
+          height: 52px;
+        }
+
+        .navbar-root::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: rgba(8, 8, 12, 0.72);
+          backdrop-filter: blur(18px) saturate(180%);
+          -webkit-backdrop-filter: blur(18px) saturate(180%);
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          opacity: 0;
+          transition: opacity 0.35s ease;
+          pointer-events: none;
+        }
+
+        .navbar-root.scrolled::before {
+          opacity: 1;
+        }
+
+        /* Logo */
+        .nav-logo {
+          font-family: 'Syne', sans-serif;
+          font-weight: 800;
+          font-size: 1.15rem;
+          letter-spacing: -0.03em;
+          color: #fff;
+          text-decoration: none;
+          position: relative;
+          z-index: 1;
+          transition: opacity 0.2s ease;
+        }
+
+        .nav-logo:hover { opacity: 0.75; }
+
+        .nav-logo span {
+          color: #7c6af5;
+        }
+
+        /* Right cluster */
+        .nav-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          position: relative;
+          z-index: 1;
+        }
+
+        /* Language button */
+        .lang-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px 6px 10px;
+          border-radius: 100px;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.04);
+          color: rgba(255,255,255,0.65);
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.78rem;
+          font-weight: 400;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+        }
+
+        .lang-btn:hover {
+          background: rgba(255,255,255,0.09);
+          color: rgba(255,255,255,0.9);
+          border-color: rgba(255,255,255,0.18);
+        }
+
+        .lang-btn svg {
+          flex-shrink: 0;
+          opacity: 0.7;
+        }
+
+        /* Dropdown */
+        .lang-dropdown {
+          position: absolute;
+          right: 0;
+          top: calc(100% + 8px);
+          min-width: 148px;
+          background: #111118;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 12px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3);
+          overflow: hidden;
+          animation: dropIn 0.18s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+          transform-origin: top right;
+        }
+
+        @keyframes dropIn {
+          from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .lang-option {
+          width: 100%;
+          text-align: left;
+          padding: 10px 16px;
+          background: transparent;
+          border: none;
+          color: rgba(255,255,255,0.55);
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.82rem;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .lang-option:hover {
+          background: rgba(255,255,255,0.05);
+          color: rgba(255,255,255,0.9);
+        }
+
+        .lang-option.active {
+          color: #9d8fff;
+          font-weight: 500;
+        }
+
+        .lang-option.active::after {
+          content: '';
+          width: 5px; height: 5px;
+          border-radius: 50%;
+          background: #7c6af5;
+          display: block;
+        }
+
+        /* Divider between options */
+        .lang-option + .lang-option {
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* Nav buttons */
+        .nav-btn {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.82rem;
+          font-weight: 500;
+          padding: 7px 18px;
+          border-radius: 100px;
+          cursor: pointer;
+          border: none;
+          transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+          letter-spacing: 0.01em;
+        }
+
+        .nav-btn-ghost {
+          background: transparent;
+          color: rgba(255,255,255,0.6);
+          border: 1px solid rgba(255,255,255,0.12);
+        }
+
+        .nav-btn-ghost:hover {
+          background: rgba(255,255,255,0.07);
+          color: rgba(255,255,255,0.9);
+          border-color: rgba(255,255,255,0.22);
+        }
+
+        .nav-btn-primary {
+          background: #7c6af5;
+          color: #fff;
+          border: 1px solid transparent;
+          box-shadow: 0 2px 12px rgba(124, 106, 245, 0.35);
+        }
+
+        .nav-btn-primary:hover {
+          background: #8f7ef7;
+          box-shadow: 0 4px 20px rgba(124, 106, 245, 0.5);
+          transform: translateY(-1px);
+        }
+
+        .nav-btn-primary:active {
+          transform: translateY(0);
+        }
+      `}</style>
+
+      <nav className={`navbar-root ${scrolled ? "scrolled" : ""}`}>
+        <div className="navbar-inner">
+          {/* Logo */}
+          <a href="/" className="nav-logo">
+            Limites<span>M2</span>
+          </a>
+
+          {/* Right side */}
+          <div className="nav-right">
+            {/* Language dropdown */}
+            <div style={{ position: "relative" }} ref={dropdownRef}>
+              <button
+                onClick={() => setLangOpen(!langOpen)}
+                className="lang-btn"
+                aria-label="Select language"
+              >
+                <Globe size={14} />
+                {selectedLang.label}
+              </button>
+
+              {langOpen && (
+                <div className="lang-dropdown">
+                  {languages.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => { setSelectedLang(lang); setLangOpen(false); }}
+                      className={`lang-option ${selectedLang.code === lang.code ? "active" : ""}`}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
-              onClick={() => setLangOpen(!langOpen)}
-              className="flex items-center justify-center w-9 h-9 rounded-full border border-border bg-secondary text-foreground hover:bg-accent transition-colors"
-              aria-label="Select language"
+              className="nav-btn nav-btn-ghost"
+              onClick={() => router.push("/signup")}
             >
-              <Globe size={18} />
+              Sign up
             </button>
 
-            {langOpen && (
-              <div className="absolute right-0 mt-2 w-40 rounded-lg bg-card border border-border shadow-lg z-50 overflow-hidden">
-                {languages.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => {
-                      setSelectedLang(lang);
-                      setLangOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-accent ${
-                      selectedLang.code === lang.code
-                        ? "text-primary font-medium"
-                        : "text-foreground"
-                    }`}
-                  >
-                    {lang.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <button
+              className="nav-btn nav-btn-primary"
+              onClick={() => router.push("/login")}
+            >
+              Log in
+            </button>
           </div>
-
-          {/* Sign Up */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-sm w-24"
-            onClick={() => router.push("/signup")}
-          >
-            Sign Up
-          </Button>
-
-          {/* Login */}
-          <Button
-            size="sm"
-            className="text-sm w-24 ml-1"
-            onClick={() => router.push("/login")}
-          >
-            Login
-          </Button>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 };
 
