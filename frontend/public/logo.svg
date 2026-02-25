@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0a0a1a"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glowStrong" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00eaff"/>
+      <stop offset="50%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#00eaff"/>
+    </linearGradient>
+    <linearGradient id="boltGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00eaff"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="48" fill="url(#bgGrad)"/>
+
+  <!-- Outer ring glow -->
+  <circle cx="256" cy="256" r="230" fill="none" stroke="#00eaff" stroke-width="1.5" opacity="0.15" filter="url(#glow)"/>
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#a855f7" stroke-width="1" opacity="0.1" filter="url(#glow)"/>
+
+  <!-- Lightning bolt icon -->
+  <g filter="url(#glowStrong)">
+    <polygon points="272,80 220,230 258,230 240,340 300,185 262,185 300,80" fill="url(#boltGrad)" opacity="0.95"/>
+  </g>
+
+  <!-- RC monogram circle background -->
+  <circle cx="256" cy="210" r="68" fill="#0a0a2a" stroke="#00eaff" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- RC text -->
+  <text x="256" y="240" font-family="Arial Black, sans-serif" font-size="62" font-weight="900"
+    text-anchor="middle" fill="url(#textGrad)" filter="url(#glowStrong)" letter-spacing="-2">RC</text>
+
+  <!-- RANDOM CHEAT text -->
+  <text x="256" y="335" font-family="Arial Black, sans-serif" font-size="42" font-weight="900"
+    text-anchor="middle" fill="url(#textGrad)" filter="url(#glow)" letter-spacing="2">RANDOM</text>
+
+  <text x="256" y="390" font-family="Arial Black, sans-serif" font-size="42" font-weight="900"
+    text-anchor="middle" fill="#ffffff" filter="url(#glow)" letter-spacing="4">CHEAT</text>
+
+  <!-- Tagline -->
+  <text x="256" y="440" font-family="Arial, sans-serif" font-size="16" font-weight="400"
+    text-anchor="middle" fill="#00eaff" opacity="0.7" letter-spacing="3">PREMIUM · INSTANT · SECURE</text>
+
+  <!-- Bottom decorative line -->
+  <line x1="80" y1="458" x2="432" y2="458" stroke="url(#textGrad)" stroke-width="1" opacity="0.4" filter="url(#glow)"/>
+</svg>
