@@ -43,19 +43,7 @@ export default function ProductCard({
         />
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-3/5 bg-gradient-to-t from-[#0a1020] to-transparent z-[4]" />
 
-        {image ? (
-          <Image
-            src={image}
-            alt={title}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            sizes="(max-width: 768px) 100vw, 33vw"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0d1525] to-[#150d25] flex items-center justify-center">
-            <ShoppingBasket className="w-12 h-12 text-white/5" />
-          </div>
-        )}
+  
 
         <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-green-500/40 backdrop-blur-md">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_6px_#22c55e] animate-pulse" />

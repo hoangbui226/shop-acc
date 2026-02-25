@@ -10,8 +10,6 @@ const ProductCard = dynamic(() => import("@/components/ProductCard"), {
   loading: () => <ProductCardSkeleton />,
 });
 import ProductCardSkeleton from "@/components/ProductCardSkeleton";
-const HERO_IMAGE =
-  "https://storage.googleapis.com/gpt-engineer-file-uploads/bLmg6dRP6kev4R35rqzaWVXOn2z2/social-images/social-1767481799431-Gemini_Generated_Image_xwftaxxwftaxxwft.png";
 
 export default function Home() {
   // Example static product data for demo
@@ -19,21 +17,12 @@ export default function Home() {
     {
       title: "Elite Weapon Skin",
       seller: "GameStore",
-      image: "https://via.placeholder.com/300x150",
       tags: ["Weapon", "Skin", "Rare"],
       price: "1200",
       usdPrice: "15",
       link: "/products/elite-weapon-skin",
     },
-    {
-      title: "Premium EXP Booster",
-      seller: "EXPShop",
-      image: "https://via.placeholder.com/300x150",
-      tags: ["EXP", "Booster"],
-      price: "800",
-      usdPrice: "10",
-      link: "/products/premium-exp-booster",
-    },
+    
   ];
   return (
     <div className="min-h-screen flex flex-col bg-[#0a0d18]">
@@ -42,7 +31,6 @@ export default function Home() {
         <header
           className="h-[calc(100vh-90px)] flex items-center relative overflow-hidden"
           style={{
-            backgroundImage: `url(${HERO_IMAGE})`,
             backgroundPosition: "center",
             backgroundSize: "cover",
           }}
