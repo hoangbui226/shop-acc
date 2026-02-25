@@ -1,13 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import Navigation from "@/components/Navigation";
+import dynamic from "next/dynamic";
+const Navigation = dynamic(() => import("@/components/Navigation"), { ssr: false });
 import { useCart } from "@/lib/cart";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function CartPage() {
   const { items, removeItem, clear, totalItems } = useCart();
   const [removingIdx, setRemovingIdx] = useState<number | null>(null);
+  const router = useRouter();
 
   const handleRemove = (idx: number) => {
     setRemovingIdx(idx);
@@ -41,21 +44,21 @@ export default function CartPage() {
               </div>
               <h2 className="empty-title">Your cart is empty</h2>
               <p className="empty-sub">Add items to get started</p>
-              <Link href="/" className="shop-link">
-                Browse marketplace
+              <button className="shop-link" onClick={() => router.push("/")}>Browse marketplace
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M5 12h14M12 5l7 7-7 7"/>
                 </svg>
-              </Link>
+              </button>
             </div>
           ) : (
-            <>
-              <div className="cart-header">
-                <h1 className="cart-title">
-                  Your Cart
-                  <span>{totalItems} {totalItems === 1 ? "item" : "items"}</span>
-                </h1>
-                <button className="cart-clear-btn" onClick={clear}>Clear all</button>
+            // ...existing code...
+            <>{/* Cart items and summary remain unchanged */}</>
+          )}
+        </main>
+      </div>
+    </>
+  );
+}
               </div>
 
               <div className="cart-items">
