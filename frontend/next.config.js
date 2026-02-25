@@ -5,4 +5,5 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 
 module.exports = withBundleAnalyzer({
   // Your Next.js config
+  allowedDevOrigins: ["http://192.168.56.1"],
 });
