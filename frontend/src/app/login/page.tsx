@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { setLoggedIn } from "@/lib/auth";
+import { setLoggedIn, getRememberedUsername } from "@/lib/auth";
 
 const LoginPage = () => {
   const router = useRouter();
@@ -21,6 +21,14 @@ const LoginPage = () => {
       router.replace("/login", { scroll: false });
     }
   }, [searchParams, router]);
+
+  useEffect(() => {
+    const saved = getRememberedUsername();
+    if (saved?.trim()) {
+      setUsername(saved.trim());
+      setRemember(true);
+    }
+  }, []);
 
   const [loginError, setLoginError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -44,7 +52,7 @@ const LoginPage = () => {
         setLoginError(data.message || "Tên đăng nhập hoặc mật khẩu không đúng.");
         return;
       }
-      setLoggedIn(data.username ?? username.trim());
+      setLoggedIn(data.username ?? username.trim(), remember);
       router.push("/");
     } catch {
       setLoginError("Lỗi kết nối. Vui lòng thử lại.");
