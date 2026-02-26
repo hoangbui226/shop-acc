@@ -309,19 +309,19 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
       <div className="tm-overlay">
         <div className="tm-backdrop" onClick={onClose} />
 
-        <div className="tm-modal" role="dialog" aria-modal="true" aria-label="Tutorial">
+        <div className="tm-modal" role="dialog" aria-modal="true" aria-label="Hướng Dẫn">
           {/* Header */}
           <div className="tm-header">
             <div className="tm-title-group">
-              <p className="tm-eyebrow">Guia passo a passo</p>
-              <h2 className="tm-title">Tutorial</h2>
+              <p className="tm-eyebrow">CHECK MXT</p>
+              <h2 className="tm-title">TUTORIAL</h2>
             </div>
             <button className="tm-close" onClick={onClose} aria-label="Fechar">
               <X size={16} />
             </button>
           </div>
 
-          <div className="tm-divider" style={{ margin: "20px 36px 0" }} />
+          <div className="tm-divider" style={{ margin: "0 36px 0" }} />
 
           {/* Body */}
           <div className="tm-body">
@@ -341,7 +341,7 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
                 onClick={() => setPlatform("adr")}
                 aria-selected={platform === "adr"}
               >
-                Android
+                ADR
               </button>
             </div>
 

@@ -2,24 +2,16 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useNavigate } from "react-router-dom";
 
 const Login = () => {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password) {
-      alert("Informe usuário e senha para continuar.");
-      return;
-    }
-
-    // TODO: replace with real sign-in API call
-    console.log("Login:", { username, password, remember });
+    console.log("Login:", email);
   };
 
   return (
@@ -29,12 +21,11 @@ const Login = () => {
           <h1 className="text-2xl font-bold text-foreground mb-6 text-center">Login</h1>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
               className="bg-background border-border text-foreground"
-              required
             />
             <Input
               type="password"
@@ -42,24 +33,7 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               className="bg-background border-border text-foreground"
-              required
             />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="remember"
-                  checked={remember}
-                  onCheckedChange={(v) => setRemember(v === true)}
-                />
-                <label
-                  htmlFor="remember"
-                  className="text-sm text-muted-foreground cursor-pointer select-none"
-                >
-                  Remember me
-                </label>
-              </div>
-            </div>
-
             <Button type="submit" className="w-full">Login</Button>
           </form>
           <p className="text-muted-foreground text-sm text-center mt-4">

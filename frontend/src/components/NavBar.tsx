@@ -3,8 +3,8 @@ import { Globe } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const languages = [
-  { code: "en", label: "English" },
   { code: "vi", label: "Tiếng Việt" },
+  { code: "en", label: "English" },
 ];
 
 const NavBar = () => {
@@ -238,7 +238,7 @@ const NavBar = () => {
         <div className="navbar-inner">
           {/* Logo */}
           <a href="/" className="nav-logo">
-            Limites<span>M2</span>
+            CHECK<span>mxt</span>
           </a>
 
           {/* Right side */}
@@ -273,14 +273,14 @@ const NavBar = () => {
               className="nav-btn nav-btn-ghost"
               onClick={() => router.push("/signup")}
             >
-              Sign up
+              Đăng Ký
             </button>
 
             <button
               className="nav-btn nav-btn-primary"
               onClick={() => router.push("/login")}
             >
-              Log in
+              Đăng Nhập
             </button>
           </div>
         </div>

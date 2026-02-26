@@ -319,14 +319,14 @@ const Index = () => {
 
         {/* ── Main card ── */}
         <div className="card">
-          <p className="card-eyebrow">Verificação de conta</p>
-          <h1 className="card-title">Checagem de<br />Limites</h1>
+          <p className="card-eyebrow">SHOP BO ARA</p>
+          <h1 className="card-title">CHECK THÔNG TIN<br />ACC</h1>
 
           <p className="card-desc">
-            Envie o <strong>token da conta</strong> para ver quais recargas estão
-            disponíveis para você via Método 2 e a{" "}
-            <span className="highlight">QUANTIDADE DE DIAMANTES</span>{" "}
-            que você já recarregou na conta até hoje.
+            Dịch Vụ Tra Cứu <strong>Thông Tin Tài Khoản</strong> Bằng Token
+            Nhanh Chóng, Đầy Đủ Và Bảo Mật{" "}
+            Tham Gia <span className="highlight">Nhóm Zalo</span>{" "}
+            Để Được Hỗ Trợ.
           </p>
 
           <div className="divider" />
@@ -337,21 +337,21 @@ const Index = () => {
                 className="token-input"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder="Cole aqui o token da sua conta"
+                placeholder="Nhập Access Token của bạn"
                 autoComplete="off"
                 spellCheck={false}
               />
             </div>
             <div className="btn-row">
               <button type="submit" className="btn btn-primary">
-                Verificar
+                CHECK
               </button>
               <button
                 type="button"
                 className="btn btn-outline"
                 onClick={() => setTutorialOpen(true)}
               >
-                Tutorial
+                HƯỚNG DẪN
               </button>
             </div>
           </form>
