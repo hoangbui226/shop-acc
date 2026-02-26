@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Globe, ChevronDown, LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Globe, ChevronDown, LogOut, User } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 import { isLoggedIn, getLoggedInUser, logout } from "@/lib/auth";
 
 const languages = [
@@ -18,11 +18,12 @@ const NavBar = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     setLoggedIn(isLoggedIn());
     setUsername(getLoggedInUser());
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -245,6 +246,90 @@ const NavBar = () => {
         .nav-btn-primary:active {
           transform: translateY(0);
         }
+
+        /* User dropdown */
+        .user-dropdown-trigger {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 14px 6px 12px;
+          border-radius: 100px;
+          border: 1px solid rgba(255,255,255,0.12);
+          background: rgba(255,255,255,0.06);
+          color: rgba(255,255,255,0.9);
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.82rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          max-width: 180px;
+        }
+
+        .user-dropdown-trigger:hover {
+          background: rgba(255,255,255,0.1);
+          border-color: rgba(255,255,255,0.2);
+        }
+
+        .user-dropdown-trigger span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .user-dropdown-trigger svg:last-child {
+          flex-shrink: 0;
+          opacity: 0.7;
+          transition: transform 0.2s ease;
+        }
+
+        .user-dropdown-trigger[aria-expanded="true"] svg:last-child {
+          transform: rotate(180deg);
+        }
+
+        .user-dropdown-menu {
+          position: absolute;
+          right: 0;
+          top: calc(100% + 8px);
+          min-width: 180px;
+          background: #111118;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 12px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3);
+          overflow: hidden;
+          animation: dropIn 0.18s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+          transform-origin: top right;
+          z-index: 50;
+        }
+
+        .user-dropdown-item {
+          width: 100%;
+          text-align: left;
+          padding: 10px 16px;
+          background: transparent;
+          border: none;
+          color: rgba(255,255,255,0.7);
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.82rem;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .user-dropdown-item:hover {
+          background: rgba(255,255,255,0.06);
+          color: #fff;
+        }
+
+        .user-dropdown-item.logout {
+          color: rgba(255, 120, 100, 0.95);
+          border-top: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .user-dropdown-item.logout:hover {
+          background: rgba(255, 120, 100, 0.08);
+        }
       `}</style>
 
       <nav className={`navbar-root ${scrolled ? "scrolled" : ""}`}>
@@ -282,19 +367,62 @@ const NavBar = () => {
               )}
             </div>
 
-            <button
-              className="nav-btn nav-btn-ghost"
-              onClick={() => router.push("/signup")}
-            >
-              Đăng Ký
-            </button>
-
-            <button
-              className="nav-btn nav-btn-primary"
-              onClick={() => router.push("/login")}
-            >
-              Đăng Nhập
-            </button>
+            {loggedIn && username ? (
+              <div style={{ position: "relative" }} ref={userDropdownRef}>
+                <button
+                  className="user-dropdown-trigger"
+                  onClick={() => setUserOpen(!userOpen)}
+                  aria-expanded={userOpen}
+                  aria-haspopup="true"
+                  aria-label="User menu"
+                >
+                  <span>{username}</span>
+                  <ChevronDown size={16} />
+                </button>
+                {userOpen && (
+                  <div className="user-dropdown-menu">
+                    <button
+                      className="user-dropdown-item"
+                      onClick={() => {
+                        setUserOpen(false);
+                        router.push("/profile");
+                      }}
+                    >
+                      <User size={16} />
+                      Thông tin tài khoản
+                    </button>
+                    <button
+                      className="user-dropdown-item logout"
+                      onClick={() => {
+                        logout();
+                        setUserOpen(false);
+                        setLoggedIn(false);
+                        setUsername(null);
+                        router.push("/");
+                      }}
+                    >
+                      <LogOut size={16} />
+                      Đăng xuất
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <button
+                  className="nav-btn nav-btn-ghost"
+                  onClick={() => router.push("/signup")}
+                >
+                  Đăng Ký
+                </button>
+                <button
+                  className="nav-btn nav-btn-primary"
+                  onClick={() => router.push("/login")}
+                >
+                  Đăng Nhập
+                </button>
+              </>
+            )}
           </div>
         </div>
       </nav>

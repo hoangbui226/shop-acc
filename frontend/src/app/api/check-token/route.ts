@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const TOKEN_API = "http://103.139.155.35:8888/token";
-const INFO_API = "http://103.139.155.35:9000/info";
-const BANNER_API = "https://eco.freefire.dev/api/ProfileBanner/";
-const BANNER_API_KEY = "AfterDusk";
-const BIND_API =
-  "https://100067.connect.garena.com/game/account_security/bind:get_bind_info";
-const PLATFORM_INFO_API =
-  "https://100067.connect.garena.com/bind/app/platform/info/get";
+function getEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
+}
 
 type TokenResponse = { error?: string; payload?: { account_id: number } };
 type InfoBasic = {
@@ -70,8 +67,9 @@ export async function GET(request: NextRequest) {
   const token = accessToken.trim();
 
   try {
+    const tokenApi = getEnv("TOKEN_API");
     const tokenRes = await fetch(
-      `${TOKEN_API}?access_token=${encodeURIComponent(token)}`
+      `${tokenApi}?access_token=${encodeURIComponent(token)}`
     );
     const tokenData: TokenResponse = await tokenRes.json();
 
@@ -89,13 +87,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const infoApi = getEnv("INFO_API");
+    const bindApi = getEnv("BIND_API");
+    const platformInfoApi = getEnv("PLATFORM_INFO_API");
     const [infoRes, bindRes, platformRes] = await Promise.all([
-      fetch(`${INFO_API}?uid=${accountId}&region=VN`),
+      fetch(`${infoApi}?uid=${accountId}&region=VN`),
       fetch(
-        `${BIND_API}?app_id=100067&access_token=${encodeURIComponent(token)}`
+        `${bindApi}?app_id=100067&access_token=${encodeURIComponent(token)}`
       ),
       fetch(
-        `${PLATFORM_INFO_API}?access_token=${encodeURIComponent(token)}`
+        `${platformInfoApi}?access_token=${encodeURIComponent(token)}`
       ),
     ]);
 
@@ -115,15 +116,17 @@ export async function GET(request: NextRequest) {
     const avatar = basic.headPic ?? 902000298;
     const banner = basic.badgeId ?? 901000008;
 
+    const bannerApi = getEnv("BANNER_API");
+    const bannerApiKey = getEnv("BANNER_API_KEY");
     const bannerParams = new URLSearchParams({
       name: nickname,
       uid,
       level: String(level),
       avatar: String(avatar),
       banner: String(banner),
-      apikey: BANNER_API_KEY,
+      apikey: bannerApiKey,
     });
-    const bannerUrl = `${BANNER_API}?${bannerParams.toString()}`;
+    const bannerUrl = `${bannerApi}?${bannerParams.toString()}`;
 
     let email = "";
     let email_to_be = "";
