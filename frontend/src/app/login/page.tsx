@@ -1,30 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { setLoggedIn, verifyCredentials } from "@/lib/auth";
+import { setLoggedIn } from "@/lib/auth";
 
 const LoginPage = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
+  const [showRegisteredMsg, setShowRegisteredMsg] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (searchParams?.get("registered") === "1") {
+      setShowRegisteredMsg(true);
+      router.replace("/login", { scroll: false });
+    }
+  }, [searchParams, router]);
+
+  const [loginError, setLoginError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError("");
     if (!username.trim() || !password.trim()) {
-      alert("Informe usuário e senha para continuar.");
+      alert("Vui lòng điền tên đăng nhập và mật khẩu.");
       return;
     }
-    if (!verifyCredentials(username.trim(), password)) {
-      alert("Tên đăng nhập hoặc mật khẩu không đúng.");
-      return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoginError(data.message || "Tên đăng nhập hoặc mật khẩu không đúng.");
+        return;
+      }
+      setLoggedIn(data.username ?? username.trim());
+      router.push("/");
+    } catch {
+      setLoginError("Lỗi kết nối. Vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
     }
-    setLoggedIn(username.trim());
-    router.push("/");
   };
 
   return (
@@ -180,6 +206,25 @@ const LoginPage = () => {
           box-shadow: 0 4px 24px rgba(124, 106, 245, 0.55);
           transform: translateY(-1px);
         }
+        .auth-registered-msg {
+          font-size: 0.85rem;
+          color: #4ade80;
+          text-align: center;
+          padding: 10px 14px;
+          margin-bottom: 16px;
+          background: rgba(74, 222, 128, 0.1);
+          border: 1px solid rgba(74, 222, 128, 0.25);
+          border-radius: 10px;
+        }
+        .auth-warning {
+          font-size: 0.75rem;
+          color: rgba(255, 120, 100, 0.95);
+          margin-top: 6px;
+          padding-left: 2px;
+        }
+        .token-input-error {
+          border-color: rgba(255, 120, 100, 0.5);
+        }
       `}</style>
 
       <div className="page-root">
@@ -187,26 +232,36 @@ const LoginPage = () => {
         <div className="card-auth">
           <h1 className="auth-title">Đăng Nhập</h1>
           <p className="auth-subtitle">Đăng Nhập Để Bắt Đầu Tra Cứu.</p>
+          {showRegisteredMsg && (
+            <p className="auth-registered-msg" role="status">
+              Đăng ký thành công. Vui lòng đăng nhập.
+            </p>
+          )}
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="auth-field-wrap">
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => { setUsername(e.target.value); setLoginError(""); }}
                 placeholder="Tên Đăng Nhập"
                 className="token-input"
                 required
+                disabled={submitting}
               />
             </div>
             <div className="auth-field-wrap">
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setLoginError(""); }}
                 placeholder="Mật Khẩu"
-                className="token-input"
+                className={`token-input ${loginError ? "token-input-error" : ""}`}
                 required
+                disabled={submitting}
               />
+              {loginError && (
+                <p className="auth-warning" role="alert">{loginError}</p>
+              )}
             </div>
             <div className="auth-options">
               <span className="remember-box">
@@ -221,8 +276,8 @@ const LoginPage = () => {
               </label>
             </div>
             <div className="auth-btn-wrap btn-row">
-              <button type="submit" className="btn btn-primary">
-                Đăng Nhập
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? "Đang đăng nhập…" : "Đăng Nhập"}
               </button>
             </div>
           </form>

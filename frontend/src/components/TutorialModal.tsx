@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { X } from "lucide-react";
+"use client";
+
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 const tutorialData = {
   ios: {
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0&modestbranding=1",
     steps: [
       {
         title: "Download the App",
@@ -27,8 +29,9 @@ const tutorialData = {
       },
     ],
   },
+
   adr: {
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    videoUrl: "https://www.youtube.com/embed/O5ItHIHCQP0?rel=0&modestbranding=1",
     steps: [
       {
         title: "Install the APK",
@@ -61,12 +64,27 @@ interface TutorialModalProps {
 
 const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
   const [platform, setPlatform] = useState<"ios" | "adr">("ios");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   if (!open) return null;
+  if (!mounted || typeof document === "undefined") return null;
 
   const data = tutorialData[platform];
 
-  return (
+  const modalContent = (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
@@ -74,7 +92,7 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
         .tm-overlay {
           position: fixed;
           inset: 0;
-          z-index: 200;
+          z-index: 9999;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -235,6 +253,21 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
           height: 100%;
         }
 
+        .tm-video-fallback {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          margin: 0;
+          padding: 10px 14px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.75rem;
+          color: rgba(255,255,255,0.45);
+          background: linear-gradient(to top, rgba(5,5,8,0.95), transparent);
+          text-align: center;
+          pointer-events: none;
+        }
+
         /* ── Steps ── */
         .tm-steps {
           display: flex;
@@ -316,8 +349,8 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
               <p className="tm-eyebrow">CHECK MXT</p>
               <h2 className="tm-title">TUTORIAL</h2>
             </div>
-            <button className="tm-close" onClick={onClose} aria-label="Fechar">
-              <X size={16} />
+            <button type="button" className="tm-close" onClick={onClose} aria-label="Đóng">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6L6 18M6 6l12 12" /></svg>
             </button>
           </div>
 
@@ -345,7 +378,7 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
               </button>
             </div>
 
-            {/* Video */}
+            {/* Video — iframe may not load if YouTube is blocked; link below opens in new tab */}
             <div className="tm-video-wrap">
               <iframe
                 key={platform}
@@ -353,7 +386,12 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
                 title={`${platform.toUpperCase()} Tutorial`}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
               />
+              <p className="tm-video-fallback" aria-live="polite">
+                Nếu video không hiển thị (do mạng hoặc trình chặn quảng cáo), vui lòng làm theo các bước bên dưới.
+              </p>
             </div>
 
             {/* Steps */}
@@ -374,6 +412,8 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
       </div>
     </>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default TutorialModal;

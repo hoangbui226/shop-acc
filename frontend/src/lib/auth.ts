@@ -13,6 +13,18 @@ export function isLoggedIn(): boolean {
   }
 }
 
+export function getLoggedInUser(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return data?.user ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function setLoggedIn(username: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(AUTH_KEY, JSON.stringify({ user: username }));

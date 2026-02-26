@@ -33,6 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local user database (passwords hashed; keep private)
+/data/users.json
+
 # vercel
 .vercel
 

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
-import { registerUser } from "@/lib/auth";
 
 const SignUpPage = () => {
   const router = useRouter();
@@ -12,17 +11,13 @@ const SignUpPage = () => {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [passwordWarning, setPasswordWarning] = useState("");
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!showSuccess) return;
-    const t = setTimeout(() => router.push("/login"), 1500);
-    return () => clearTimeout(t);
-  }, [showSuccess, router]);
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordWarning("");
+    setUsernameError("");
     if (!username.trim() || !password.trim() || !confirm.trim()) {
       alert("Vui lòng điền đầy đủ các trường.");
       return;
@@ -31,11 +26,32 @@ const SignUpPage = () => {
       setPasswordWarning("Mật khẩu không trùng khớp. Vui lòng kiểm tra lại.");
       return;
     }
-    registerUser(username.trim(), password);
-    setShowSuccess(true);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        setUsernameError(data.message || "Tên đăng nhập đã được sử dụng.");
+        return;
+      }
+      if (!res.ok) {
+        setUsernameError(data.error || data.message || "Đăng ký thất bại. Vui lòng thử lại.");
+        return;
+      }
+      router.replace("/login?registered=1");
+    } catch {
+      setUsernameError("Lỗi kết nối. Vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const clearPasswordWarning = () => setPasswordWarning("");
+  const clearUsernameError = () => setUsernameError("");
 
   return (
     <>
@@ -182,16 +198,7 @@ const SignUpPage = () => {
       <div className="page-root">
         <NavBar />
         <div className="card-auth">
-          {showSuccess ? (
-            <div className="auth-success-box">
-              <p className="auth-success-title">Thành Công</p>
-              <p className="auth-success-msg">Đã Đăng Ký Tài Khoản</p>
-              <p className="auth-success-msg" style={{ marginTop: 12, fontSize: "0.8rem" }}>
-                Đang chuyển đến trang đăng nhập...
-              </p>
-            </div>
-          ) : (
-            <>
+          <>
           <h1 className="auth-title">Đăng Ký</h1>
           <p className="auth-subtitle">
             Đăng Ký Để Tra Cứu Thông Tin Tài Khoản.
@@ -201,11 +208,15 @@ const SignUpPage = () => {
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => { setUsername(e.target.value); clearUsernameError(); }}
                 placeholder="Tên Đăng Nhập"
-                className="token-input"
+                className={`token-input ${usernameError ? "token-input-error" : ""}`}
                 required
+                disabled={submitting}
               />
+              {usernameError && (
+                <p className="auth-warning" role="alert">{usernameError}</p>
+              )}
             </div>
             <div className="auth-field-wrap">
               <input
@@ -231,8 +242,8 @@ const SignUpPage = () => {
               )}
             </div>
             <div className="auth-btn-wrap btn-row">
-              <button type="submit" className="btn btn-primary">
-                Đăng Ký
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? "Đang đăng ký…" : "Đăng Ký"}
               </button>
             </div>
           </form>
@@ -242,8 +253,7 @@ const SignUpPage = () => {
               Đăng Nhập
             </Link>
           </p>
-            </>
-          )}
+          </>
         </div>
       </div>
     </>

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { Globe } from "lucide-react";
+import { Globe, ChevronDown, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { isLoggedIn, getLoggedInUser, logout } from "@/lib/auth";
 
 const languages = [
   { code: "vi", label: "Tiếng Việt" },
@@ -9,15 +10,27 @@ const languages = [
 
 const NavBar = () => {
   const [langOpen, setLangOpen] = useState(false);
+  const [userOpen, setUserOpen] = useState(false);
   const [selectedLang, setSelectedLang] = useState(languages[0]);
   const [scrolled, setScrolled] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setLoggedIn(isLoggedIn());
+    setUsername(getLoggedInUser());
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setLangOpen(false);
+      }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setUserOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
