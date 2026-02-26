@@ -16,7 +16,20 @@ const SignUp = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!captchaChecked) return;
-    console.log("Sign up:", username);
+
+    if (!username.trim() || !password || !confirm) {
+      // Basic required check; you can replace with your own UI feedback
+      alert("Preencha todos os campos para continuar.");
+      return;
+    }
+
+    if (password !== confirm) {
+      alert("As senhas não coincidem. Tente novamente.");
+      return;
+    }
+
+    // TODO: replace with real sign-up API call
+    console.log("Sign up:", { username, password });
   };
 
   return (
@@ -32,6 +45,7 @@ const SignUp = () => {
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Username"
               className="bg-background border-border text-foreground"
+              required
             />
             <Input
               type="password"
@@ -39,13 +53,15 @@ const SignUp = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               className="bg-background border-border text-foreground"
+              required
             />
             <Input
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Confirm Password"
+              placeholder="Retype password"
               className="bg-background border-border text-foreground"
+              required
             />
             {/* Captcha */}
             <div className="flex items-center gap-3 rounded-md border border-border bg-secondary/50 p-3">
