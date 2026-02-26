@@ -14,6 +14,8 @@ export type StoredUser = {
   passwordHash?: string;
   type: UserType;
   registeredAt: string;
+  /** Optional membership expiration (e.g. "2026-12-31 23:59:59 GMT+7" or ISO string). */
+  expiresAt?: string;
 };
 
 async function ensureDataDir(): Promise<void> {
@@ -36,6 +38,7 @@ export async function readUsers(): Promise<StoredUser[]> {
       passwordHash: u.passwordHash as string | undefined,
       type: (u.type as StoredUser["type"]) || "user",
       registeredAt: (u.registeredAt as string) || new Date(0).toISOString(),
+      expiresAt: u.expiresAt as string | undefined,
     }));
   } catch {
     return [];

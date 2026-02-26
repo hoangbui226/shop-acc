@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       username: user.username,
       type: user.type,
       registeredAt: user.registeredAt,
+      expiresAt: user.expiresAt ?? null,
     });
   } catch (e) {
     console.error("User info API error:", e);

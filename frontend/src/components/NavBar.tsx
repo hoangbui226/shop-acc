@@ -8,6 +8,27 @@ const languages = [
   { code: "en", label: "English" },
 ];
 
+function formatExpiration(expiresAt: string): string {
+  try {
+    const d = new Date(expiresAt);
+    if (Number.isNaN(d.getTime())) return expiresAt;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return expiresAt;
+  }
+}
+
+type UserInfo = { type: string; expiresAt: string | null };
+
+const MEMBER_TYPE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  vip: "VIP",
+  user: "Thành viên",
+};
+
 const NavBar = () => {
   const [langOpen, setLangOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -15,6 +36,7 @@ const NavBar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -23,7 +45,24 @@ const NavBar = () => {
   useEffect(() => {
     setLoggedIn(isLoggedIn());
     setUsername(getLoggedInUser());
+    setUserInfo(null);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!userOpen || !username?.trim()) return;
+    let cancelled = false;
+    fetch(`/api/user/info?username=${encodeURIComponent(username.trim())}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || data.error) return;
+        setUserInfo({
+          type: data.type ?? "user",
+          expiresAt: data.expiresAt ?? null,
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [userOpen, username]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -330,6 +369,34 @@ const NavBar = () => {
         .user-dropdown-item.logout:hover {
           background: rgba(255, 120, 100, 0.08);
         }
+
+        .user-dropdown-info {
+          padding: 12px 16px;
+          border-bottom: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.02);
+        }
+
+        .user-dropdown-info-row {
+          font-size: 0.78rem;
+          color: rgba(255,255,255,0.6);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 4px;
+        }
+
+        .user-dropdown-info-row:last-child {
+          margin-bottom: 0;
+        }
+
+        .user-dropdown-info-label {
+          min-width: 64px;
+        }
+
+        .user-dropdown-info-value {
+          color: rgba(255,255,255,0.9);
+          font-weight: 500;
+        }
       `}</style>
 
       <nav className={`navbar-root ${scrolled ? "scrolled" : ""}`}>
@@ -381,6 +448,24 @@ const NavBar = () => {
                 </button>
                 {userOpen && (
                   <div className="user-dropdown-menu">
+                    <div className="user-dropdown-info">
+                      <div className="user-dropdown-info-row">
+                        <span className="user-dropdown-info-label">Loại:</span>
+                        <span className="user-dropdown-info-value">
+                          {userInfo ? MEMBER_TYPE_LABELS[userInfo.type] ?? userInfo.type : "…"}
+                        </span>
+                      </div>
+                      <div className="user-dropdown-info-row">
+                        <span className="user-dropdown-info-label">Hết hạn:</span>
+                        <span className="user-dropdown-info-value">
+                          {userInfo
+                            ? (userInfo.expiresAt
+                                ? formatExpiration(userInfo.expiresAt)
+                                : "Không giới hạn")
+                            : "…"}
+                        </span>
+                      </div>
+                    </div>
                     <button
                       className="user-dropdown-item"
                       onClick={() => {
