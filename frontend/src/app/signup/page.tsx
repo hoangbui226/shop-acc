@@ -1,26 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
+import { registerUser } from "@/lib/auth";
 
 const SignUpPage = () => {
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [passwordWarning, setPasswordWarning] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!showSuccess) return;
+    const t = setTimeout(() => router.push("/login"), 1500);
+    return () => clearTimeout(t);
+  }, [showSuccess, router]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setPasswordWarning("");
     if (!username.trim() || !password.trim() || !confirm.trim()) {
-      alert("Preencha todos os campos para continuar.");
+      alert("Vui lòng điền đầy đủ các trường.");
       return;
     }
     if (password !== confirm) {
-      alert("As senhas não coincidem. Tente novamente.");
+      setPasswordWarning("Mật khẩu không trùng khớp. Vui lòng kiểm tra lại.");
       return;
     }
-    console.log("Sign up:", { username, password });
+    registerUser(username.trim(), password);
+    setShowSuccess(true);
   };
+
+  const clearPasswordWarning = () => setPasswordWarning("");
 
   return (
     <>
@@ -139,11 +154,44 @@ const SignUpPage = () => {
           box-shadow: 0 4px 24px rgba(124, 106, 245, 0.55);
           transform: translateY(-1px);
         }
+        .auth-warning {
+          font-size: 0.75rem;
+          color: rgba(255, 120, 100, 0.95);
+          margin-top: 6px;
+          padding-left: 2px;
+        }
+        .token-input-error {
+          border-color: rgba(255, 120, 100, 0.5);
+        }
+        .auth-success-box {
+          text-align: center;
+          padding: 24px 20px;
+        }
+        .auth-success-box .auth-success-title {
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: #4ade80;
+          margin-bottom: 8px;
+        }
+        .auth-success-box .auth-success-msg {
+          font-size: 0.9rem;
+          color: rgba(255,255,255,0.7);
+        }
       `}</style>
 
       <div className="page-root">
         <NavBar />
         <div className="card-auth">
+          {showSuccess ? (
+            <div className="auth-success-box">
+              <p className="auth-success-title">Thành Công</p>
+              <p className="auth-success-msg">Đã Đăng Ký Tài Khoản</p>
+              <p className="auth-success-msg" style={{ marginTop: 12, fontSize: "0.8rem" }}>
+                Đang chuyển đến trang đăng nhập...
+              </p>
+            </div>
+          ) : (
+            <>
           <h1 className="auth-title">Đăng Ký</h1>
           <p className="auth-subtitle">
             Đăng Ký Để Tra Cứu Thông Tin Tài Khoản.
@@ -163,7 +211,7 @@ const SignUpPage = () => {
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); clearPasswordWarning(); }}
                 placeholder="Mật Khẩu"
                 className="token-input"
                 required
@@ -173,11 +221,14 @@ const SignUpPage = () => {
               <input
                 type="password"
                 value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
+                onChange={(e) => { setConfirm(e.target.value); clearPasswordWarning(); }}
                 placeholder="Nhập Lại Mật Khẩu"
-                className="token-input"
+                className={`token-input ${passwordWarning ? "token-input-error" : ""}`}
                 required
               />
+              {passwordWarning && (
+                <p className="auth-warning" role="alert">{passwordWarning}</p>
+              )}
             </div>
             <div className="auth-btn-wrap btn-row">
               <button type="submit" className="btn btn-primary">
@@ -191,6 +242,8 @@ const SignUpPage = () => {
               Đăng Nhập
             </Link>
           </p>
+            </>
+          )}
         </div>
       </div>
     </>

@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { setLoggedIn, verifyCredentials } from "@/lib/auth";
 
 const LoginPage = () => {
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -16,7 +19,12 @@ const LoginPage = () => {
       alert("Informe usuário e senha para continuar.");
       return;
     }
-    console.log("Login:", { username, password, remember });
+    if (!verifyCredentials(username.trim(), password)) {
+      alert("Tên đăng nhập hoặc mật khẩu không đúng.");
+      return;
+    }
+    setLoggedIn(username.trim());
+    router.push("/");
   };
 
   return (

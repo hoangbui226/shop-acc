@@ -1,7 +1,10 @@
 "use client";
+
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import TutorialModal from "@/components/TutorialModal";
+import { isLoggedIn } from "@/lib/auth";
 
 /* ─────────────────────────────────────────────
    Inline styles — no Tailwind / shadcn needed
@@ -10,6 +13,7 @@ import TutorialModal from "@/components/TutorialModal";
 ───────────────────────────────────────────── */
 
 const Index = () => {
+  const router = useRouter();
   const [token, setToken] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -17,6 +21,10 @@ const Index = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLoggedIn()) {
+      router.push("/login");
+      return;
+    }
     if (!token.trim()) return;
     setShowResults(true);
     setLoading(true);
@@ -129,6 +137,15 @@ const Index = () => {
           padding: 2px 7px;
           margin-top: 4px;
         }
+        .card-desc .highlight-link {
+          text-decoration: none;
+          transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+        .card-desc .highlight-link:hover {
+          color: #e0daff;
+          background: rgba(124, 106, 245, 0.2);
+          border-color: rgba(124, 106, 245, 0.35);
+        }
 
         /* ── Divider ── */
         .divider {
@@ -240,6 +257,17 @@ const Index = () => {
           color: rgba(255, 200, 80, 0.75);
           font-weight: 500;
         }
+        .notice-text .notice-link {
+          color: rgba(255, 200, 80, 0.9);
+          font-weight: 500;
+          text-decoration: none;
+          border-bottom: 1px solid rgba(255, 200, 80, 0.4);
+          transition: color 0.2s ease, border-color 0.2s ease;
+        }
+        .notice-text .notice-link:hover {
+          color: rgba(255, 220, 120, 1);
+          border-color: rgba(255, 220, 120, 0.7);
+        }
 
         /* ── Results card ── */
         .results-card {
@@ -325,7 +353,15 @@ const Index = () => {
           <p className="card-desc">
             Dịch Vụ Tra Cứu <strong>Thông Tin Tài Khoản</strong> Bằng Token
             Nhanh Chóng, Đầy Đủ Và Bảo Mật{" "}
-            Tham Gia <span className="highlight">Nhóm Zalo</span>{" "}
+            Tham Gia{" "}
+            <a
+              href="https://zalo.me/g/yourgroup"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="highlight highlight-link"
+            >
+              Nhóm Zalo
+            </a>{" "}
             Để Được Hỗ Trợ.
           </p>
 
@@ -361,9 +397,16 @@ const Index = () => {
               <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
             </svg>
             <p className="notice-text">
-              <strong>IMPORTANTE:</strong> Nas quantidades que mostram por ex: 620 ou 930,
-              significa que você só tem limite de 1 recarga incluindo as duas — ou seja,
-              se você fizer 930, não poderá fazer 620 também.
+              <strong>LƯU Ý:</strong> TUYỆT ĐỐI KHÔNG CHIA SẺ TOKEN VỚI BẤT KÌ AI.
+              ĐIỀU NÀY CÓ THỂ KHIỂN ACC BẠN BỊ KHÓA VĨNH VIÊN!
+              <br />
+              MỌI TOKEN TRÊN TRANG WEB ĐƯỢC BẢO MẬT TUYỆT ĐỐI.
+              <br />
+              MỌI THẮC MẮC VUI LÒNG LIÊN HỆ ADMIN{" "}
+              <a href="https://zalo.me/g/yourgroup" target="_blank" rel="noopener noreferrer" className="notice-link">
+                TẠI ĐÂY
+              </a>
+              .
             </p>
           </div>
         </div>
@@ -371,11 +414,11 @@ const Index = () => {
         {/* ── Results card ── */}
         {showResults && (
           <div className="card">
-            <p className="results-label">Resultado da verificação</p>
+            <p className="results-label">KẾT QUẢ</p>
             {loading ? (
               <div className="spinner-wrap">
                 <div className="spinner" />
-                <span className="spinner-text">Consultando API…</span>
+                <span className="spinner-text">ĐANG TRA CỨU…</span>
               </div>
             ) : (
               <div className="results-content">
