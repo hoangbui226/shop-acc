@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "../index.css";
 
 export const metadata: Metadata = {
-  title: "LimitesM2 — Checagem de Limites",
-  description: "Verifique suas recargas e histórico de diamantes.",
+  title: "CheckMXT.COM - Check mail xác thực và liên kết ẩn.",
+  description: "Check mail xác thực và liên kết ẩn. Tool bảo mật acc Free Fire toàn diện, tiện lợi, nhanh chóng.",
 };
 
 export default function RootLayout({
