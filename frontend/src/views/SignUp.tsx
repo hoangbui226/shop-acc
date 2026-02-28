@@ -1,17 +1,19 @@
+"use client";
+
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useNavigate } from "react-router-dom";
 import NavBar from "@/components/NavBar";
 
 const SignUp = () => {
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [captchaChecked, setCaptchaChecked] = useState(false);
-  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +66,7 @@ const SignUp = () => {
           </form>
           <p className="text-muted-foreground text-sm text-center mt-4">
             Already have an account?{" "}
-            <button onClick={() => navigate("/login")} className="text-primary hover:underline">
+            <button type="button" onClick={() => router.push("/login")} className="text-primary hover:underline">
               Login
             </button>
           </p>

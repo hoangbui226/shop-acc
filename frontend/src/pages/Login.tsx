@@ -1,13 +1,15 @@
+"use client";
+
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { useNavigate } from "react-router-dom";
 
 const Login = () => {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +40,7 @@ const Login = () => {
           </form>
           <p className="text-muted-foreground text-sm text-center mt-4">
             Don't have an account?{" "}
-            <button onClick={() => navigate("/signup")} className="text-primary hover:underline">
+            <button type="button" onClick={() => router.push("/signup")} className="text-primary hover:underline">
               Sign Up
             </button>
           </p>

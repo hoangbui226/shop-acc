@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { setLoggedIn, getRememberedUsername } from "@/lib/auth";
 
-const LoginPage = () => {
+function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
@@ -299,6 +299,12 @@ const LoginPage = () => {
       </div>
     </>
   );
-};
+}
 
-export default LoginPage;
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#070710] text-white/70">Đang tải…</div>}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
