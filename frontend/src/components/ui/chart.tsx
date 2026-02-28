@@ -89,9 +89,17 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
+/** Props Recharts passes to custom tooltip content (active, payload, label, etc.). */
+type RechartsTooltipContentProps = {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: unknown; dataKey?: string; color?: string; fill?: string; payload?: Record<string, unknown> }>;
+  label?: string;
+  labelFormatter?: (label: unknown, payload: RechartsTooltipContentProps["payload"]) => React.ReactNode;
+};
+
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
+  RechartsTooltipContentProps &
     React.ComponentProps<"div"> & {
       hideLabel?: boolean;
       hideIndicator?: boolean;
