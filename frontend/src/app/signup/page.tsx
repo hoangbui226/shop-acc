@@ -1,9 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: string | HTMLElement, opts: { sitekey: string; callback?: (token: string) => void }) => string;
+      getResponse: (widgetId: string) => string;
+      reset?: (widgetId: string) => void;
+    };
+  }
+}
 
 const SignUpPage = () => {
   const router = useRouter();
@@ -13,6 +25,30 @@ const SignUpPage = () => {
   const [passwordWarning, setPasswordWarning] = useState("");
   const [usernameError, setUsernameError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const turnstileWidgetIdRef = useRef<string | null>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY || !turnstileContainerRef.current) return;
+    const el = turnstileContainerRef.current;
+    const load = () => {
+      if (window.turnstile && el && !el.hasChildNodes()) {
+        turnstileWidgetIdRef.current = window.turnstile.render(el, { sitekey: TURNSTILE_SITE_KEY });
+      }
+    };
+    if (window.turnstile) {
+      load();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    script.onload = load;
+    document.head.appendChild(script);
+    return () => {
+      script.remove();
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,12 +62,20 @@ const SignUpPage = () => {
       setPasswordWarning("Mật khẩu không trùng khớp. Vui lòng kiểm tra lại.");
       return;
     }
+    let turnstileToken = "";
+    if (TURNSTILE_SITE_KEY && turnstileWidgetIdRef.current && window.turnstile) {
+      turnstileToken = window.turnstile.getResponse(turnstileWidgetIdRef.current) ?? "";
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+          turnstileToken: turnstileToken || undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 409) {
@@ -193,6 +237,8 @@ const SignUpPage = () => {
           font-size: 0.9rem;
           color: rgba(255,255,255,0.7);
         }
+        .turnstile-wrap { display: flex; justify-content: center; }
+        .turnstile-container { min-height: 65px; }
       `}</style>
 
       <div className="page-root">
@@ -241,6 +287,11 @@ const SignUpPage = () => {
                 <p className="auth-warning" role="alert">{passwordWarning}</p>
               )}
             </div>
+            {TURNSTILE_SITE_KEY && (
+              <div className="auth-field-wrap turnstile-wrap">
+                <div ref={turnstileContainerRef} className="turnstile-container" aria-label="Xác minh CAPTCHA" />
+              </div>
+            )}
             <div className="auth-btn-wrap btn-row">
               <button type="submit" className="btn btn-primary" disabled={submitting}>
                 {submitting ? "Đang đăng ký…" : "Đăng Ký"}

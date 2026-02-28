@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useNavigate } from "react-router-dom";
-import Navbar from "@/components/Navbar";
+import NavBar from "@/components/NavBar";
 
 const SignUp = () => {
   const [username, setUsername] = useState("");
@@ -34,7 +34,7 @@ const SignUp = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 pt-20">
-      <Navbar />
+      <NavBar />
       <Card className="w-full max-w-md border-border">
         <CardContent className="p-8">
           <h1 className="text-2xl font-bold text-foreground mb-6 text-center">Sign Up</h1>

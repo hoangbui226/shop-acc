@@ -35,6 +35,14 @@ yarn-error.log*
 
 # local user database (passwords hashed; keep private)
 /data/users.json
+# local jobs store
+/data/jobs.json
+# service grants (global promo per feature)
+/data/service-grants.json
+# banned IPs (admin-managed)
+/data/banned-ips.json
+# valid access tokens (sensitive; dir configurable via ACCESS_TOKENS_DIR)
+/data/access.json
 
 # vercel
 .vercel

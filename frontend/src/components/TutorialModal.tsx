@@ -1,57 +1,69 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+
+const TICKET_URL = "https://ticket.kiosgamer.co.id/";
+const CALLBACK_URL = "https://api-otrss.garena.com/support/callback/?access_token=";
 
 const tutorialData = {
   ios: {
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0&modestbranding=1",
+    videoUrl: "https://www.youtube.com/embed/Y1ydQ2WrpSU?rel=0&modestbranding=1",
     steps: [
       {
-        title: "Download the App",
+        title: "Tải App ProxyPin",
         description:
-          "Go to the App Store on your iPhone or iPad. Search for the application and tap 'Get' to download and install it on your device.",
+          "Mở App Store trên iPhone hoặc iPad của bạn. Tìm ứng dụng ProxyPin và nhấn 'Tải xuống' để tải và cài đặt trên thiết bị của bạn.",
       },
       {
-        title: "Create Your Account",
+        title: "Tải và cài đặt chứng chỉ ProxyPin",
         description:
-          "Open the app and tap 'Sign Up'. Fill in your details including email and password, then verify your email address to activate your account.",
+          "Bật HTTPS Proxy, cài đặt và tin cậy chứng chỉ ProxyPin.",
       },
       {
-        title: "Get Your Token",
+        title: "Lấy Token",
         description:
-          "Navigate to Settings > Account > Token. Tap 'Copy Token' to copy it to your clipboard. You will use this token in the Checagem de Limites tool.",
+          "Bật ProxyPin và đăng nhập vào game. Sau đó tìm từ khóa 'Inspect' và copy token.",
       },
       {
-        title: "Check Your Limits",
+        title: "Check Thông Tin",
         description:
-          "Paste your token into the input field on the main page and click 'Consultar'. Your available recharges and diamond history will be displayed.",
+          "Dán Token vào trang web và nhấn 'Check' để xem thông tin tài khoản.",
       },
     ],
   },
 
   adr: {
-    videoUrl: "https://www.youtube.com/embed/O5ItHIHCQP0?rel=0&modestbranding=1",
+    videoUrl: "https://www.youtube.com/embed/XlMGhzkZwKo?rel=0&modestbranding=1",
     steps: [
       {
-        title: "Install the APK",
-        description:
-          "Download the APK file from the official website. Go to Settings > Security and enable 'Unknown Sources', then install the APK.",
+        title: "Đăng nhập vào trang web",
+        description: (
+          <>
+            Đăng nhập vào trang web{" "}
+            <a href={TICKET_URL} target="_blank" rel="noopener noreferrer" className="tm-step-link">
+              {TICKET_URL}
+            </a>{" "}
+            để lấy eat token.
+          </>
+        ),
       },
       {
-        title: "Register Your Account",
-        description:
-          "Launch the app and tap 'Register'. Enter your email, create a strong password, and complete the verification process.",
+        title: "Dán token sang trang web mới",
+        description: (
+          <>
+            Dán token sang trang web{" "}
+            <a href={CALLBACK_URL} target="_blank" rel="noopener noreferrer" className="tm-step-link">
+              {CALLBACK_URL}
+            </a>{" "}
+            để lấy access token.
+          </>
+        ),
       },
       {
-        title: "Retrieve Your Token",
+        title: "Lấy token từ thanh tìm kiếm",
         description:
-          "Open the side menu and go to Profile > Token Management. Tap 'Generate Token' and copy the generated token to your clipboard.",
-      },
-      {
-        title: "Verify Your Limits",
-        description:
-          "Go back to the Checagem de Limites page, paste your token, and press 'Consultar' to see your available recharges and diamond usage.",
+          "Lấy token từ thanh tìm kiếm và dán lại vào web để xem thông tin tài khoản.",
       },
     ],
   },
@@ -282,28 +294,42 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
           padding-bottom: 28px;
         }
 
-        .tm-step:last-child { padding-bottom: 0; }
+        .tm-step:last-child { padding-bottom: 28px; }
 
-        /* Vertical line */
-        .tm-step:not(:last-child) .tm-step-line {
+        /* Vertical line: always out of flow so last step is not shifted */
+        .tm-step-line {
           position: absolute;
+          left: 0;
+          top: 0;
+          width: 0;
+          height: 0;
+          overflow: hidden;
+          pointer-events: none;
+        }
+        .tm-step:not(:last-child) .tm-step-line {
           left: 15px;
           top: 32px;
           bottom: 0;
           width: 1px;
+          height: auto;
           background: linear-gradient(to bottom, rgba(124,106,245,0.3), rgba(124,106,245,0.05));
         }
 
         .tm-step-num {
           flex-shrink: 0;
-          width: 32px; height: 32px;
+          width: 32px;
+          min-width: 32px;
+          height: 32px;
           border-radius: 50%;
           background: rgba(124, 106, 245, 0.12);
           border: 1px solid rgba(124, 106, 245, 0.25);
-          display: flex; align-items: center; justify-content: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           font-family: 'Syne', sans-serif;
           font-size: 0.75rem;
           font-weight: 700;
+          font-variant-numeric: tabular-nums;
           color: #9d8fff;
           position: relative;
           z-index: 1;
@@ -329,6 +355,22 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
           line-height: 1.7;
           color: rgba(255,255,255,0.38);
           font-weight: 300;
+        }
+
+        .tm-step-desc .tm-step-link {
+          color: #8f7ef7;
+          font-weight: 500;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+          padding: 2px 6px;
+          margin: 0 1px;
+          border-radius: 6px;
+          background: rgba(124, 106, 245, 0.15);
+          transition: background 0.15s ease, color 0.15s ease;
+        }
+        .tm-step-desc .tm-step-link:hover {
+          color: #b5a8f9;
+          background: rgba(124, 106, 245, 0.25);
         }
 
         /* ── Divider ── */
@@ -366,7 +408,7 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
                 onClick={() => setPlatform("ios")}
                 aria-selected={platform === "ios"}
               >
-                iOS
+                CÁCH 1
               </button>
               <button
                 role="tab"
@@ -374,7 +416,7 @@ const TutorialModal = ({ open, onClose }: TutorialModalProps) => {
                 onClick={() => setPlatform("adr")}
                 aria-selected={platform === "adr"}
               >
-                ADR
+                CÁCH 2
               </button>
             </div>
 

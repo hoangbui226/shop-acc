@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import TutorialModal from "@/components/TutorialModal";
-import { isLoggedIn } from "@/lib/auth";
+import { isLoggedIn, getLoggedInUser } from "@/lib/auth";
+import type { UserFeature } from "@/lib/users-types";
 
 /* ─────────────────────────────────────────────
    Inline styles — no Tailwind / shadcn needed
@@ -127,8 +128,69 @@ const Index = () => {
   const [countdownDisplay, setCountdownDisplay] = useState("");
   const [boundedAccounts, setBoundedAccounts] = useState<BoundedAccount[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<number[]>([]);
-  const [mailVisible, setMailVisible] = useState({ mail: false, mailToBe: false, countdown: false });
+  const [mailRevealed, setMailRevealed] = useState(false);
+  const [linkRevealed, setLinkRevealed] = useState(false);
+  const [expandedTool, setExpandedTool] = useState<string | null>(null);
+  const [showCopyNotification, setShowCopyNotification] = useState(false);
+  const [remaining, setRemaining] = useState<Record<string, number>>({});
+  const [showNoPermissionToast, setShowNoPermissionToast] = useState(false);
+  const [spamConfirmOpen, setSpamConfirmOpen] = useState(false);
+  const [spamConfirmNgay, setSpamConfirmNgay] = useState(15);
+  const [spamConfirmGio, setSpamConfirmGio] = useState(0);
+  const [spamConfirmPhut, setSpamConfirmPhut] = useState(0);
+  const [spamConfirmSubmitting, setSpamConfirmSubmitting] = useState(false);
+  const [spamConfirmError, setSpamConfirmError] = useState("");
+  const [spamLoginLimitRemainingMinutes, setSpamLoginLimitRemainingMinutes] = useState<number | null>(null);
+  const [spamToast, setSpamToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const resultsCardRef = useRef<HTMLDivElement>(null);
+  const copyNotificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const noPermissionToastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canUseCheckInfo = (remaining.check_info ?? 0) > 0;
+  const canUseTool = (feature: UserFeature) => (remaining[feature] ?? 0) > 0;
+
+  /** Start a job (deducts quota). Returns true if the job was started successfully. */
+  const startJobAndRefresh = async (feature: UserFeature, extra?: Record<string, unknown>): Promise<boolean> => {
+    const username = getLoggedInUser();
+    if (!username) return false;
+    try {
+      const res = await fetch("/api/jobs/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Username": username },
+        body: JSON.stringify({ feature, ...extra }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        if (data.remaining) setRemaining(data.remaining);
+        if (feature === "spam_login" && data.spamLoginLimitRemainingMinutes != null)
+          setSpamLoginLimitRemainingMinutes(data.spamLoginLimitRemainingMinutes);
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  };
+
+  /** Format minutes as "X ngày Y giờ" for Giới hạn display. */
+  const formatLimitRemaining = (minutes: number): string => {
+    if (minutes <= 0) return "0 ngày 00 giờ";
+    const days = Math.floor(minutes / (24 * 60));
+    const hours = Math.floor((minutes % (24 * 60)) / 60);
+    return `${days} ngày ${String(hours).padStart(2, "0")} giờ`;
+  };
+
+  const showNoPermission = () => {
+    setShowNoPermissionToast(true);
+    if (noPermissionToastRef.current) clearTimeout(noPermissionToastRef.current);
+    noPermissionToastRef.current = setTimeout(() => {
+      setShowNoPermissionToast(false);
+      noPermissionToastRef.current = null;
+    }, 2500);
+  };
+
+  const toggleTool = (id: string) => {
+    setExpandedTool((prev) => (prev === id ? null : id));
+  };
 
   useEffect(() => {
     if (showResults && resultsCardRef.current) {
@@ -136,12 +198,69 @@ const Index = () => {
     }
   }, [showResults]);
 
+  useEffect(() => {
+    return () => {
+      if (copyNotificationTimeoutRef.current) clearTimeout(copyNotificationTimeoutRef.current);
+      if (noPermissionToastRef.current) clearTimeout(noPermissionToastRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!spamConfirmOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [spamConfirmOpen]);
+
+  useEffect(() => {
+    if (!spamConfirmOpen) return;
+    const username = getLoggedInUser();
+    if (!username) return;
+    setSpamLoginLimitRemainingMinutes(null);
+    fetch(`/api/user/info?username=${encodeURIComponent(username)}`)
+      .then((r) => r.json())
+      .then((info) => {
+        if (info.error) return;
+        if (info.spamLoginLimitRemainingMinutes != null)
+          setSpamLoginLimitRemainingMinutes(info.spamLoginLimitRemainingMinutes);
+        if (info.remaining) setRemaining(info.remaining);
+      })
+      .catch(() => {});
+  }, [spamConfirmOpen]);
+
+  useEffect(() => {
+    if (!spamToast) return;
+    const t = setTimeout(() => setSpamToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [spamToast]);
+
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).catch(() => {});
+    navigator.clipboard.writeText(text).then(() => {
+      if (copyNotificationTimeoutRef.current) clearTimeout(copyNotificationTimeoutRef.current);
+      setShowCopyNotification(true);
+      copyNotificationTimeoutRef.current = setTimeout(() => {
+        setShowCopyNotification(false);
+        copyNotificationTimeoutRef.current = null;
+      }, 2000);
+    }).catch(() => {});
   };
 
-  const toggleMailVisible = (key: keyof typeof mailVisible) => {
-    setMailVisible((prev) => ({ ...prev, [key]: !prev[key] }));
+  /** Mask email as v******@g****.com (first char + ****** @ first char + **** . tld). */
+  const maskEmail = (email: string): string => {
+    const s = (email || "").trim();
+    if (!s) return "****";
+    const at = s.indexOf("@");
+    if (at <= 0 || at >= s.length - 1) return "****";
+    const local = s.slice(0, at);
+    const domain = s.slice(at + 1);
+    const dot = domain.lastIndexOf(".");
+    const domainName = dot >= 0 ? domain.slice(0, dot) : domain;
+    const tld = dot >= 0 ? domain.slice(dot) : "";
+    const localMasked = local[0] + "******";
+    const domainMasked = (domainName[0] ?? "") + "****" + tld;
+    return `${localMasked}@${domainMasked}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,7 +284,11 @@ const Index = () => {
     setCountdownDisplay("");
     setBoundedAccounts([]);
     setAvailablePlatforms([]);
-    setMailVisible({ mail: false, mailToBe: false, countdown: false });
+    setMailRevealed(false);
+    setLinkRevealed(false);
+    setRemaining({});
+
+    const username = getLoggedInUser();
 
     try {
       const res = await fetch(
@@ -187,6 +310,14 @@ const Index = () => {
 
       if (data.bannerUrl) {
         setBannerUrl(data.bannerUrl);
+        if (username) {
+          fetch(`/api/user/info?username=${encodeURIComponent(username)}`)
+            .then((r) => r.json())
+            .then((info) => {
+              if (!info.error && info.remaining) setRemaining(info.remaining);
+            })
+            .catch(() => {});
+        }
       } else {
         setError("Không nhận được banner từ server.");
       }
@@ -710,6 +841,338 @@ const Index = () => {
           width: 16px;
           height: 16px;
         }
+        .copyable-row-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          pointer-events: none;
+        }
+
+        .copy-toast {
+          position: fixed;
+          bottom: 24px;
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 10px 20px;
+          background: rgba(28, 28, 40, 0.95);
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 10px;
+          color: rgba(255,255,255,0.95);
+          font-size: 0.9rem;
+          font-family: 'DM Sans', sans-serif;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+          z-index: 1000;
+          animation: copy-toast-in 0.2s ease-out;
+        }
+        .copy-toast-warning {
+          background: rgba(28, 22, 18, 0.96);
+          border-color: rgba(251, 146, 60, 0.4);
+          color: #fdba74;
+        }
+        .copy-toast-success {
+          background: rgba(22, 28, 22, 0.96);
+          border-color: rgba(74, 222, 128, 0.4);
+          color: #4ade80;
+        }
+
+        @keyframes copy-toast-in {
+          from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+
+        .spam-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.6);
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+        .spam-modal-card {
+          background: linear-gradient(145deg, rgba(28, 28, 40, 0.98), rgba(22, 22, 32, 0.98));
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 20px;
+          max-width: 480px;
+          width: 100%;
+          padding: 28px 24px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .spam-modal-title {
+          font-family: 'Syne', sans-serif;
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: rgba(255,255,255,0.95);
+          margin: 0 0 20px 0;
+          text-align: center;
+        }
+        .spam-modal-banner-wrap {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 24px;
+        }
+        .spam-modal-banner {
+          width: 100%;
+          max-width: 400px;
+          min-height: 160px;
+          height: auto;
+          object-fit: contain;
+        }
+        .spam-modal-duration-row {
+          display: flex;
+          gap: 12px;
+          margin-bottom: 20px;
+          align-items: flex-end;
+        }
+        .spam-modal-duration-box {
+          flex: 1;
+          min-width: 0;
+        }
+        .spam-modal-duration-label {
+          display: block;
+          font-size: 0.8rem;
+          color: rgba(255,255,255,0.65);
+          margin-bottom: 8px;
+        }
+        .spam-modal-duration-input {
+          width: 100%;
+          padding: 12px 14px;
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 10px;
+          background: rgba(255,255,255,0.06);
+          color: #fff;
+          font-size: 1rem;
+          box-sizing: border-box;
+        }
+        .spam-modal-limit {
+          font-size: 0.85rem;
+          color: rgba(255,255,255,0.7);
+          margin: 0 0 12px 0;
+        }
+        .spam-modal-datetime-wrap {
+          margin-bottom: 20px;
+        }
+        .spam-modal-datetime {
+          font-size: 0.8rem;
+          color: rgba(255,255,255,0.6);
+          margin: 0 0 6px 0;
+        }
+        .spam-modal-datetime strong {
+          color: rgba(255,255,255,0.85);
+        }
+        .spam-modal-error {
+          font-size: 0.85rem;
+          color: #f87171;
+          margin: 0 0 16px 0;
+        }
+        .spam-modal-actions {
+          display: flex;
+          gap: 12px;
+          margin-top: 24px;
+        }
+        .spam-modal-actions button {
+          flex: 1;
+          padding: 12px;
+          border-radius: 10px;
+          font-size: 0.95rem;
+          font-weight: 600;
+          cursor: pointer;
+          border: none;
+        }
+        .spam-modal-btn-confirm {
+          background: linear-gradient(135deg, #7c6af5, #6b5bd4);
+          color: #fff;
+        }
+        .spam-modal-btn-confirm:hover:not(:disabled) {
+          filter: brightness(1.1);
+        }
+        .spam-modal-btn-confirm:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+        .spam-modal-btn-cancel {
+          background: rgba(255,255,255,0.08);
+          color: rgba(255,255,255,0.9);
+          border: 1px solid rgba(255,255,255,0.2);
+        }
+        .spam-modal-btn-cancel:hover {
+          background: rgba(255,255,255,0.12);
+        }
+
+        .mail-box {
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 10px;
+          background: rgba(255,255,255,0.02);
+          padding: 14px 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+        }
+        .mail-box-rows {
+          flex: 1;
+          min-width: 0;
+        }
+        .mail-box-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 14px;
+          font-size: 0.85rem;
+        }
+        .mail-box-row:last-child {
+          margin-bottom: 0;
+        }
+        .mail-box-label {
+          color: rgba(255,255,255,0.55);
+          flex-shrink: 0;
+          min-width: 110px;
+        }
+        .mail-box-cell {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 2px;
+        }
+        .mail-box-value {
+          flex: 0 1 auto;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: rgba(255,255,255,0.9);
+          font-family: ui-monospace, monospace;
+          letter-spacing: 0.02em;
+        }
+        .mail-box-copy-btn {
+          flex-shrink: 0;
+          width: 20px;
+          height: 20px;
+          padding: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: none;
+          outline: none;
+          background: none;
+          color: rgba(255,255,255,0.5);
+          cursor: pointer;
+          transition: color 0.2s;
+        }
+        .mail-box-copy-btn:hover:not(:disabled) {
+          color: rgba(255,255,255,0.9);
+        }
+        .mail-box-copy-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .mail-box-copy-btn svg {
+          width: 12px;
+          height: 12px;
+        }
+        .mail-box-actions {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+        .mail-box-actions .copyable-row-btn {
+          width: 32px;
+          height: 32px;
+        }
+
+        .link-detail-scroll-wrap {
+          margin-top: 0;
+        }
+        @media (max-width: 768px) {
+          .link-detail-scroll-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-left: -2px;
+            margin-right: -2px;
+            padding-left: 2px;
+            padding-right: 2px;
+          }
+          .link-detail-scroll-wrap .mail-box.link-detail-box,
+          .link-detail-scroll-wrap .mail-box {
+            min-width: min-content;
+          }
+        }
+
+        .link-detail-box {
+          margin-top: 0;
+        }
+
+        .link-detail-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .link-detail-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 18px;
+          height: 18px;
+          flex-shrink: 0;
+        }
+
+        .link-detail-icon svg {
+          width: 14px;
+          height: 14px;
+        }
+
+        .link-platform-row {
+          margin-bottom: 12px;
+        }
+        .link-platform-row:last-child {
+          margin-bottom: 0;
+        }
+        .link-platform-cell {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex: 1;
+          min-width: 0;
+        }
+        .link-platform-avatar {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          object-fit: cover;
+          flex-shrink: 0;
+          background: rgba(255,255,255,0.08);
+        }
+        .link-platform-avatar-placeholder {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          background: rgba(255,255,255,0.06);
+        }
+        .link-platform-avatar-placeholder svg {
+          width: 12px;
+          height: 12px;
+          opacity: 0.8;
+        }
+        .link-platform-value {
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
 
         .link-main-row {
           display: flex;
@@ -850,6 +1313,123 @@ const Index = () => {
           padding: 8px 0;
         }
 
+        .tool-item {
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 10px;
+          background: rgba(255,255,255,0.02);
+          margin-bottom: 8px;
+          overflow: hidden;
+        }
+        .tool-item:last-child {
+          margin-bottom: 0;
+        }
+        .tool-item-header {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 14px;
+          background: transparent;
+          border: none;
+          color: rgba(255,255,255,0.9);
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.9rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s;
+          text-align: left;
+        }
+        .tool-item-header:hover {
+          background: rgba(255,255,255,0.05);
+        }
+        .tool-item-header svg {
+          flex-shrink: 0;
+          width: 18px;
+          height: 18px;
+          opacity: 0.7;
+          transition: transform 0.2s;
+        }
+        .tool-item.expanded .tool-item-header svg {
+          transform: rotate(180deg);
+        }
+        .tool-item-header-text {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .tool-free-badge {
+          display: inline-block;
+          padding: 2px 8px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+          color: rgba(74, 222, 128, 0.95);
+          background: rgba(74, 222, 128, 0.15);
+          border: 1px solid rgba(74, 222, 128, 0.35);
+          border-radius: 100px;
+          vertical-align: middle;
+        }
+        .tool-item-body {
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.25s ease-out;
+        }
+        .tool-item.expanded .tool-item-body {
+          max-height: 280px;
+        }
+        .tool-item-inner {
+          padding: 0 14px 14px;
+          border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .tool-desc-wrap {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          margin: 12px 0 14px;
+        }
+        .tool-desc-image {
+          flex-shrink: 0;
+          width: 48px;
+          height: 48px;
+          border-radius: 10px;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.08);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .tool-desc-image svg {
+          width: 26px;
+          height: 26px;
+          color: rgba(124, 106, 245, 0.8);
+        }
+        .tool-desc {
+          font-size: 0.82rem;
+          color: rgba(255,255,255,0.6);
+          line-height: 1.5;
+          margin: 0;
+          flex: 1;
+          min-width: 0;
+        }
+        .tool-confirm-btn {
+          display: inline-block;
+          padding: 8px 18px;
+          border-radius: 8px;
+          border: 1px solid rgba(124, 106, 245, 0.5);
+          background: rgba(124, 106, 245, 0.15);
+          color: #a5a0f0;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.85rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s, border-color 0.2s;
+        }
+        .tool-confirm-btn:hover {
+          background: rgba(124, 106, 245, 0.25);
+          border-color: rgba(124, 106, 245, 0.7);
+        }
+
         /* ── Grid noise overlay ── */
         .noise {
           position: fixed;
@@ -876,7 +1456,7 @@ const Index = () => {
             Nhanh Chóng, Đầy Đủ Và Bảo Mật{" "}
             Tham Gia{" "}
             <a
-              href="https://zalo.me/g/yourgroup"
+              href="https://zalo.me/g/onvtcj860"
               target="_blank"
               rel="noopener noreferrer"
               className="highlight highlight-link"
@@ -918,13 +1498,12 @@ const Index = () => {
               <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
             </svg>
             <p className="notice-text">
-              <strong>LƯU Ý:</strong> TUYỆT ĐỐI KHÔNG CHIA SẺ TOKEN VỚI BẤT KÌ AI.
-              ĐIỀU NÀY CÓ THỂ KHIỂN ACC BẠN BỊ KHÓA VĨNH VIÊN!
+              <strong>LƯU Ý:</strong> TRANG WEB ĐƯỢC TẠO RA VỚI MỤC ĐÍCH TRA CỨU THÔNG TIN TÀI KHOẢN.
               <br />
-              MỌI TOKEN TRÊN TRANG WEB ĐƯỢC BẢO MẬT TUYỆT ĐỐI.
+              KHÔNG CỔ XÚY CHO BẤT KÌ HÀNH ĐỘNG SCAM, LỪA ĐẢO TÀI KHOẢN.
               <br />
               MỌI THẮC MẮC VUI LÒNG LIÊN HỆ ADMIN{" "}
-              <a href="https://zalo.me/g/yourgroup" target="_blank" rel="noopener noreferrer" className="notice-link">
+              <a href="https://zalo.me/+84349332754" target="_blank" rel="noopener noreferrer" className="notice-link">
                 TẠI ĐÂY
               </a>
               .
@@ -986,91 +1565,323 @@ const Index = () => {
                 <div className="result-sections">
                   <div className="result-section">
                     <h3 className="result-section-title">Mail xác thực</h3>
-                    <div className="copyable-row">
-                      <span className="copyable-row-label">Mail Xác Thực</span>
-                      <span className={`copyable-row-value ${!mailVisible.mail ? "masked" : ""}`}>
-                        {mailVisible.mail ? (email || "—") : "••••••••••••••••"}
-                      </span>
-                      <span className="copyable-row-actions">
-                        <button type="button" className="copyable-row-btn" onClick={() => copyToClipboard(email)} title="Sao chép" aria-label="Sao chép">
-                          <CopyIcon />
+                    <div className="link-detail-scroll-wrap">
+                    <div className="mail-box">
+                      <div className="mail-box-rows">
+                        <div className="mail-box-row">
+                          <span className="mail-box-label">Mail Xác Thực</span>
+                          <div className="mail-box-cell">
+                            <span className="mail-box-value">
+                              {mailRevealed ? (email || "—") : (email ? maskEmail(email) : "****")}
+                            </span>
+                            <button
+                              type="button"
+                              className="mail-box-copy-btn"
+                              onClick={() => mailRevealed && copyToClipboard(email || "")}
+                              disabled={!mailRevealed}
+                              title={mailRevealed ? "Sao chép" : "Hiện để sao chép"}
+                              aria-label="Sao chép mail"
+                            >
+                              <CopyIcon />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mail-box-row">
+                          <span className="mail-box-label">Mail đang gắn</span>
+                          <div className="mail-box-cell">
+                            <span className="mail-box-value">
+                              {mailRevealed ? (emailToBe || "Not Available") : "********"}
+                            </span>
+                            <button
+                              type="button"
+                              className="mail-box-copy-btn"
+                              onClick={() => mailRevealed && copyToClipboard(emailToBe || "")}
+                              disabled={!mailRevealed}
+                              title={mailRevealed ? "Sao chép" : "Hiện để sao chép"}
+                              aria-label="Sao chép mail đang gắn"
+                            >
+                              <CopyIcon />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mail-box-row">
+                          <span className="mail-box-label">Thời gian gắn</span>
+                          <div className="mail-box-cell">
+                            <span className="mail-box-value">
+                              {mailRevealed ? (countdownDisplay || "Not Available") : "********"}
+                            </span>
+                            <button
+                              type="button"
+                              className="mail-box-copy-btn"
+                              onClick={() => mailRevealed && copyToClipboard(countdownDisplay || "")}
+                              disabled={!mailRevealed}
+                              title={mailRevealed ? "Sao chép" : "Hiện để sao chép"}
+                              aria-label="Sao chép thời gian"
+                            >
+                              <CopyIcon />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mail-box-actions">
+                        <button
+                          type="button"
+                          className="copyable-row-btn"
+                          onClick={async () => {
+                            if (mailRevealed) {
+                              setMailRevealed(false);
+                              return;
+                            }
+                            if (!canUseCheckInfo) {
+                              showNoPermission();
+                              return;
+                            }
+                            const ok = await startJobAndRefresh("check_info");
+                            if (ok) setMailRevealed(true);
+                          }}
+                          title={mailRevealed ? "Ẩn" : canUseCheckInfo ? "Hiện (trừ 1 lần tra cứu)" : "Không có quyền"}
+                          aria-label={mailRevealed ? "Ẩn" : "Hiện"}
+                        >
+                          {mailRevealed ? <EyeOffIcon /> : <EyeIcon />}
                         </button>
-                        <button type="button" className="copyable-row-btn" onClick={() => toggleMailVisible("mail")} title={mailVisible.mail ? "Ẩn" : "Hiện"} aria-label={mailVisible.mail ? "Ẩn" : "Hiện"}>
-                          {mailVisible.mail ? <EyeOffIcon /> : <EyeIcon />}
-                        </button>
-                      </span>
+                      </div>
                     </div>
-                    <div className="copyable-row">
-                      <span className="copyable-row-label">Mail đang gắn</span>
-                      <span className={`copyable-row-value ${!mailVisible.mailToBe ? "masked" : ""}`}>
-                        {mailVisible.mailToBe ? (emailToBe || "Not Available") : "••••••••••••••••"}
-                      </span>
-                      <span className="copyable-row-actions">
-                        <button type="button" className="copyable-row-btn" onClick={() => copyToClipboard(emailToBe)} title="Sao chép" aria-label="Sao chép">
-                          <CopyIcon />
-                        </button>
-                        <button type="button" className="copyable-row-btn" onClick={() => toggleMailVisible("mailToBe")} title={mailVisible.mailToBe ? "Ẩn" : "Hiện"} aria-label={mailVisible.mailToBe ? "Ẩn" : "Hiện"}>
-                          {mailVisible.mailToBe ? <EyeOffIcon /> : <EyeIcon />}
-                        </button>
-                      </span>
-                    </div>
-                    <div className="copyable-row">
-                      <span className="copyable-row-label">Thời gian gắn</span>
-                      <span className={`copyable-row-value ${!mailVisible.countdown ? "masked" : ""}`}>
-                        {mailVisible.countdown ? (countdownDisplay || "Not Available") : "••••••••••••••••"}
-                      </span>
-                      <span className="copyable-row-actions">
-                        <button type="button" className="copyable-row-btn" onClick={() => copyToClipboard(countdownDisplay)} title="Sao chép" aria-label="Sao chép">
-                          <CopyIcon />
-                        </button>
-                        <button type="button" className="copyable-row-btn" onClick={() => toggleMailVisible("countdown")} title={mailVisible.countdown ? "Ẩn" : "Hiện"} aria-label={mailVisible.countdown ? "Ẩn" : "Hiện"}>
-                          {mailVisible.countdown ? <EyeOffIcon /> : <EyeIcon />}
-                        </button>
-                      </span>
                     </div>
                   </div>
                   <div className="result-section">
                     <h3 className="result-section-title">Liên kết</h3>
-                    {(() => {
-                      const mainLinked = PLATFORM_ORDER.filter((p) => !availablePlatforms.includes(p));
-                      return mainLinked.length > 0 ? (
-                        <div className="link-main-row">
-                          <span className="link-main-label">Liên kết chính</span>
-                          <div className="link-main-icons">
-                            {mainLinked.map((p) => (
-                              <span key={p} className="link-platform-icon" title={PLATFORM_LABELS[p]}>
-                                <PlatformIcon platform={p} />
+                    <div className="link-detail-scroll-wrap">
+                    <div className="mail-box link-detail-box">
+                      <div className="mail-box-rows">
+                        {PLATFORM_ORDER.map((platformId) => {
+                          const acc = boundedAccounts.find((a) => a.platform === platformId);
+                          const nickname = acc?.user_info?.nickname ?? "";
+                          const email = acc?.user_info?.email ?? "";
+                          const parts = [nickname, email].filter(Boolean);
+                          const displayValue = parts.length > 0 ? parts.join(" · ") : "Chưa liên kết";
+                          const iconUrl = acc?.user_info?.icon;
+                          return (
+                            <div key={platformId} className="mail-box-row link-platform-row">
+                              <span className="mail-box-label link-detail-label">
+                                <span className="link-detail-icon">
+                                  <PlatformIcon platform={platformId} />
+                                </span>
+                                {PLATFORM_LABELS[platformId]}
                               </span>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null;
-                    })()}
-                    <div>
-                      {PLATFORM_ORDER.filter((platformId) => availablePlatforms.includes(platformId)).map((platformId) => {
-                        const acc = boundedAccounts.find((a) => a.platform === platformId);
-                        return (
-                          <div key={platformId} className="link-box">
-                            <span className="link-platform-icon" title={PLATFORM_LABELS[platformId]}>
-                              <PlatformIcon platform={platformId} />
-                            </span>
-                            <div className={`link-platform-value ${!acc ? "available" : ""}`}>
-                              {acc ? (
-                                <>
-                                  {acc.user_info?.icon ? (
-                                    <img src={acc.user_info.icon} alt="" className="link-item-avatar" />
-                                  ) : (
-                                    <div className="link-item-avatar" style={{ background: "rgba(255,255,255,0.15)" }} />
-                                  )}
-                                  <span className="link-item-name">{acc.user_info?.nickname || "—"}</span>
-                                </>
-                              ) : (
-                                <span>Available</span>
-                              )}
+                              <div className="mail-box-cell link-platform-cell">
+                                {linkRevealed && iconUrl ? (
+                                  <img
+                                    src={iconUrl}
+                                    alt=""
+                                    className="link-platform-avatar"
+                                  />
+                                ) : (
+                                  <span className="link-platform-avatar-placeholder" aria-hidden>
+                                    <PlatformIcon platform={platformId} />
+                                  </span>
+                                )}
+                                <span className="mail-box-value link-platform-value">
+                                  {linkRevealed ? displayValue : "********"}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="mail-box-copy-btn"
+                                  onClick={() => linkRevealed && copyToClipboard(displayValue)}
+                                  disabled={!linkRevealed}
+                                  title={linkRevealed ? "Sao chép" : "Hiện để sao chép"}
+                                  aria-label={`Sao chép ${PLATFORM_LABELS[platformId]}`}
+                                >
+                                  <CopyIcon />
+                                </button>
+                              </div>
                             </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mail-box-actions">
+                        <button
+                          type="button"
+                          className="copyable-row-btn"
+                          onClick={async () => {
+                            if (linkRevealed) {
+                              setLinkRevealed(false);
+                              return;
+                            }
+                            if (!canUseCheckInfo) {
+                              showNoPermission();
+                              return;
+                            }
+                            const ok = await startJobAndRefresh("check_info");
+                            if (ok) setLinkRevealed(true);
+                          }}
+                          title={linkRevealed ? "Ẩn" : canUseCheckInfo ? "Hiện (trừ 1 lần tra cứu)" : "Không có quyền"}
+                          aria-label={linkRevealed ? "Ẩn" : "Hiện"}
+                        >
+                          {linkRevealed ? <EyeOffIcon /> : <EyeIcon />}
+                        </button>
+                      </div>
+                    </div>
+                    </div>
+                  </div>
+
+                  <div className="result-section">
+                    <h3 className="result-section-title">Công cụ</h3>
+                    <div className={expandedTool === "removeMail" ? "tool-item expanded" : "tool-item"}>
+                      <button
+                        type="button"
+                        className="tool-item-header"
+                        onClick={() => toggleTool("removeMail")}
+                        aria-expanded={expandedTool === "removeMail"}
+                      >
+                        Gỡ mail xác thực ({remaining.remove_mail ?? 0})
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                      </button>
+                      <div className="tool-item-body">
+                        <div className="tool-item-inner">
+                          <div className="tool-desc-wrap">
+                            <div className="tool-desc-image" aria-hidden>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                                <path d="M22 6l-10 7L2 6" />
+                                <line x1="8" y1="12" x2="16" y2="12" />
+                              </svg>
+                            </div>
+                            <p className="tool-desc">Gỡ email xác thực khỏi tài khoản. Sau khi thực hiện, tài khoản sẽ không còn mail xác thực đã gắn.</p>
                           </div>
-                        );
-                      })}
+                          <button
+                            type="button"
+                            className="tool-confirm-btn"
+                            onClick={() => {
+                              if (!canUseTool("remove_mail")) {
+                                showNoPermission();
+                                return;
+                              }
+                              startJobAndRefresh("remove_mail");
+                            }}
+                          >
+                            Xác nhận gỡ mail
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={expandedTool === "attachMail" ? "tool-item expanded" : "tool-item"}>
+                      <button
+                        type="button"
+                        className="tool-item-header"
+                        onClick={() => toggleTool("attachMail")}
+                        aria-expanded={expandedTool === "attachMail"}
+                      >
+                        Gắn mail xác thực ({remaining.attach_mail ?? 0})
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                      </button>
+                      <div className="tool-item-body">
+                        <div className="tool-item-inner">
+                          <div className="tool-desc-wrap">
+                            <div className="tool-desc-image" aria-hidden>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                                <path d="M22 6l-10 7L2 6" />
+                                <line x1="12" y1="11" x2="12" y2="17" />
+                                <line x1="9" y1="14" x2="15" y2="14" />
+                              </svg>
+                            </div>
+                            <p className="tool-desc">Gắn email xác thực mới vào tài khoản. Bạn cần có quyền truy cập vào email đó để xác nhận.</p>
+                          </div>
+                          <button
+                            type="button"
+                            className="tool-confirm-btn"
+                            onClick={() => {
+                              if (!canUseTool("attach_mail")) {
+                                showNoPermission();
+                                return;
+                              }
+                              startJobAndRefresh("attach_mail");
+                            }}
+                          >
+                            Xác nhận gắn mail
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={expandedTool === "spamLogin" ? "tool-item expanded" : "tool-item"}>
+                      <button
+                        type="button"
+                        className="tool-item-header"
+                        onClick={() => toggleTool("spamLogin")}
+                        aria-expanded={expandedTool === "spamLogin"}
+                      >
+                        Spam login ({remaining.spam_login ?? 0})
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                      </button>
+                      <div className="tool-item-body">
+                        <div className="tool-item-inner">
+                          <div className="tool-desc-wrap">
+                            <div className="tool-desc-image" aria-hidden>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M23 4v6h-6" />
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                              </svg>
+                            </div>
+                            <p className="tool-desc">Gửi nhiều yêu cầu đăng nhập liên tiếp. Chỉ sử dụng khi cần thiết và đúng mục đích.</p>
+                          </div>
+                          <button
+                            type="button"
+                            className="tool-confirm-btn"
+                            onClick={() => {
+                              if (!canUseTool("spam_login")) {
+                                showNoPermission();
+                                return;
+                              }
+                              setSpamConfirmError("");
+                              setSpamConfirmNgay(15);
+                              setSpamConfirmGio(0);
+                              setSpamConfirmPhut(0);
+                              setSpamConfirmOpen(true);
+                            }}
+                          >
+                            Xác nhận spam login
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={expandedTool === "getOtp" ? "tool-item expanded" : "tool-item"}>
+                      <button
+                        type="button"
+                        className="tool-item-header"
+                        onClick={() => toggleTool("getOtp")}
+                        aria-expanded={expandedTool === "getOtp"}
+                      >
+                        <span className="tool-item-header-text">Nhận mã OTP<span className="tool-free-badge">Miễn phí</span></span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                      </button>
+                      <div className="tool-item-body">
+                        <div className="tool-item-inner">
+                          <div className="tool-desc-wrap">
+                            <div className="tool-desc-image" aria-hidden>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="8" cy="15" r="4" />
+                                <path d="M10.85 12.15L19 4" />
+                                <path d="M18 5l2-2" />
+                                <path d="M15 8l2-2" />
+                              </svg>
+                            </div>
+                            <p className="tool-desc">Yêu cầu gửi mã OTP về email hoặc số điện thoại đã liên kết. Mã sẽ hết hạn sau vài phút.</p>
+                          </div>
+                          <button
+                            type="button"
+                            className="tool-confirm-btn"
+                            onClick={() => {
+                              if (!canUseTool("get_otp")) {
+                                showNoPermission();
+                                return;
+                              }
+                              startJobAndRefresh("get_otp");
+                            }}
+                          >
+                            Xác nhận nhận OTP
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1079,7 +1890,206 @@ const Index = () => {
           </div>
         )}
 
+        {/* Spam login confirmation modal */}
+        {spamConfirmOpen && (
+          <div
+            className="spam-modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="spam-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !spamConfirmSubmitting) setSpamConfirmOpen(false);
+            }}
+          >
+            <div className="spam-modal-card" onClick={(e) => e.stopPropagation()}>
+              <h2 id="spam-modal-title" className="spam-modal-title">Xác nhận spam login</h2>
+              {bannerUrl && (
+                <div className="spam-modal-banner-wrap">
+                  <img src={bannerUrl} alt="" className="spam-modal-banner" />
+                </div>
+              )}
+              <div className="spam-modal-duration-row">
+                <div className="spam-modal-duration-box">
+                  <label className="spam-modal-duration-label">Ngày</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={15}
+                    value={spamConfirmNgay}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (!Number.isNaN(v)) setSpamConfirmNgay(Math.max(0, Math.min(15, v)));
+                    }}
+                    className="spam-modal-duration-input"
+                    disabled={spamConfirmSubmitting}
+                  />
+                </div>
+                <div className="spam-modal-duration-box">
+                  <label className="spam-modal-duration-label">Giờ</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={spamConfirmGio}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (!Number.isNaN(v)) setSpamConfirmGio(Math.max(0, Math.min(23, v)));
+                    }}
+                    className="spam-modal-duration-input"
+                    disabled={spamConfirmSubmitting}
+                  />
+                </div>
+                <div className="spam-modal-duration-box">
+                  <label className="spam-modal-duration-label">Phút</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={spamConfirmPhut}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (!Number.isNaN(v)) setSpamConfirmPhut(Math.max(0, Math.min(59, v)));
+                    }}
+                    className="spam-modal-duration-input"
+                    disabled={spamConfirmSubmitting}
+                  />
+                </div>
+              </div>
+              <p className="spam-modal-limit">
+                Giới hạn: {spamLoginLimitRemainingMinutes != null ? formatLimitRemaining(spamLoginLimitRemainingMinutes) : "…"}
+              </p>
+              <div className="spam-modal-datetime-wrap">
+                <p className="spam-modal-datetime">
+                  <strong>Bắt đầu:</strong>{" "}
+                  {new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "short", timeStyle: "short" })}
+                </p>
+                <p className="spam-modal-datetime">
+                  <strong>Kết thúc:</strong>{" "}
+                  {(() => {
+                    const totalMinutes = spamConfirmNgay * 24 * 60 + spamConfirmGio * 60 + spamConfirmPhut;
+                    const end = new Date(Date.now() + Math.max(1, totalMinutes) * 60 * 1000);
+                    return end.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "short", timeStyle: "short" });
+                  })()}
+                </p>
+              </div>
+              {spamConfirmError && (
+                <p className="spam-modal-error" role="alert">{spamConfirmError}</p>
+              )}
+              <div className="spam-modal-actions">
+                <button
+                  type="button"
+                  className="spam-modal-btn-cancel"
+                  onClick={() => {
+                    if (!spamConfirmSubmitting) setSpamConfirmOpen(false);
+                  }}
+                  disabled={spamConfirmSubmitting}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="spam-modal-btn-confirm"
+                  disabled={spamConfirmSubmitting}
+                  onClick={async () => {
+                    if (!canUseTool("spam_login")) {
+                      setSpamConfirmError("Bạn không còn quyền sử dụng tính năng này.");
+                      return;
+                    }
+                    const accessToken = token.trim();
+                    if (!accessToken) {
+                      setSpamConfirmError("Không có token. Vui lòng check token trước.");
+                      return;
+                    }
+                    const totalMinutes = spamConfirmNgay * 24 * 60 + spamConfirmGio * 60 + spamConfirmPhut;
+                    if (totalMinutes < 1) {
+                      setSpamConfirmError("Thời gian chạy tối thiểu 1 phút.");
+                      return;
+                    }
+                    const limit = spamLoginLimitRemainingMinutes ?? 0;
+                    if (totalMinutes > limit) {
+                      setSpamConfirmError(
+                        limit <= 0
+                          ? "Bạn đã dùng hết giới hạn spam login."
+                          : `Vượt quá giới hạn. Còn lại: ${formatLimitRemaining(limit)}.`
+                      );
+                      return;
+                    }
+                    setSpamConfirmError("");
+                    setSpamConfirmSubmitting(true);
+                    try {
+                      const addRes = await fetch(
+                        `/api/spam/add?access_token=${encodeURIComponent(accessToken)}`
+                      );
+                      const addData = await addRes.json().catch(() => ({}));
+                      if (!addRes.ok || addData.ok !== true) {
+                        const errMsg = (addData.error ?? addData["0"]) || "Không thêm được bot.";
+                        setSpamConfirmError(errMsg);
+                        setSpamToast({ type: "error", message: errMsg });
+                        return;
+                      }
+                      const username = getLoggedInUser();
+                      const jobRes = await fetch("/api/jobs/start", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-Username": username ?? "" },
+                        body: JSON.stringify({
+                          feature: "spam_login",
+                          spamLoginDurationMinutes: Math.max(1, totalMinutes),
+                          bannerUrl: bannerUrl ?? undefined,
+                          accessToken,
+                        }),
+                      });
+                      const jobData = await jobRes.json().catch(() => ({}));
+                      if (!jobRes.ok) {
+                        const errMsg = (jobData.error as string) || "Vượt quá giới hạn spam login hoặc lỗi server.";
+                        setSpamConfirmError(errMsg);
+                        setSpamToast({ type: "error", message: errMsg });
+                        if (jobData.spamLoginLimitRemainingMinutes != null)
+                          setSpamLoginLimitRemainingMinutes(jobData.spamLoginLimitRemainingMinutes);
+                        return;
+                      }
+                      if (jobData.remaining) setRemaining(jobData.remaining);
+                      if (jobData.spamLoginLimitRemainingMinutes != null)
+                        setSpamLoginLimitRemainingMinutes(jobData.spamLoginLimitRemainingMinutes);
+                      setSpamConfirmOpen(false);
+                      setSpamToast({ type: "success", message: "Đã thêm spam login thành công." });
+                      setTimeout(() => router.push("/profile"), 1200);
+                    } catch {
+                      const errMsg = "Lỗi kết nối. Vui lòng thử lại.";
+                      setSpamConfirmError(errMsg);
+                      setSpamToast({ type: "error", message: errMsg });
+                    } finally {
+                      setSpamConfirmSubmitting(false);
+                    }
+                  }}
+                >
+                  {spamConfirmSubmitting ? "Đang xử lý…" : "Xác nhận"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <TutorialModal open={tutorialOpen} onClose={() => setTutorialOpen(false)} />
+
+        {showCopyNotification && (
+          <div className="copy-toast" role="status" aria-live="polite">
+            Đã sao chép
+          </div>
+        )}
+        {showNoPermissionToast && (
+          <div className="copy-toast copy-toast-warning" role="alert" aria-live="assertive">
+            Bạn không có quyền sử dụng tính năng này
+          </div>
+        )}
+        {spamToast && (
+          <div
+            className={`copy-toast ${spamToast.type === "error" ? "copy-toast-warning" : "copy-toast-success"}`}
+            role="status"
+            aria-live="polite"
+          >
+            {spamToast.message}
+          </div>
+        )}
       </div>
     </>
   );

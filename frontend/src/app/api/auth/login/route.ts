@@ -22,6 +22,12 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+    if (user.banned) {
+      return NextResponse.json(
+        { error: "account_banned", message: "Tài khoản đã bị khóa. Liên hệ quản trị viên." },
+        { status: 403 }
+      );
+    }
 
     const match = user.password !== undefined
       ? user.password === password
