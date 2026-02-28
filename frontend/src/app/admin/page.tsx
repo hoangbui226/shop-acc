@@ -40,6 +40,9 @@ type AdminJobRow = {
   meta?: { bannerUrl?: string };
 };
 
+/** Per-feature expiry (ISO date string or null). Used in edit-user save payload. */
+type ExpiresAtByFeature = Partial<Record<UserFeature, string | null>>;
+
 /** True if user has access to tools (admin or at least one feature with job allowance > 0). */
 function hasAccessToTools(u: UserRow): boolean {
   if (u.type === "admin") return true;
@@ -71,12 +74,34 @@ export default function AdminPage() {
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [banningUser, setBanningUser] = useState<string | null>(null);
   const [deletingUser, setDeletingUser] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const BATCH_OPTIONS = [10, 25, 50, 100] as const;
 
   const filteredUsers = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return users;
     return users.filter((u) => u.username.toLowerCase().includes(q));
   }, [users, searchQuery]);
+
+  const totalCount = filteredUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginatedUsers = React.useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredUsers.slice(start, start + pageSize);
+  }, [filteredUsers, safePage, pageSize]);
+
+  // Reset to page 1 when search or page size changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, pageSize]);
+
+  // Clamp current page when total shrinks
+  React.useEffect(() => {
+    if (currentPage > totalPages && totalPages >= 1) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const fetchUsers = useCallback(async () => {
     const username = getLoggedInUser();
@@ -461,6 +486,21 @@ export default function AdminPage() {
         .admin-service-item-meta { font-size: 0.8rem; color: rgba(255,255,255,0.5); }
         .admin-service-item-btn { padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: #f87171; border: none; cursor: pointer; }
         .admin-service-item-btn:hover { background: rgba(239, 68, 68, 0.35); }
+        .admin-count-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin-bottom: 16px; }
+        .admin-count-text { font-size: 0.9rem; color: rgba(255,255,255,0.7); }
+        .admin-count-text strong { color: #fff; }
+        .admin-batch-wrap { display: flex; align-items: center; gap: 8px; }
+        .admin-batch-wrap label { font-size: 0.85rem; color: rgba(255,255,255,0.55); }
+        .admin-batch-select { padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); color: #fff; font-size: 0.88rem; cursor: pointer; }
+        .admin-batch-select:focus { outline: none; border-color: rgba(124, 106, 245, 0.5); }
+        .admin-showing { font-size: 0.85rem; color: rgba(255,255,255,0.5); }
+        .admin-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; }
+        .admin-page-btn { min-width: 36px; height: 36px; padding: 0 10px; border: none; border-radius: 8px; font-size: 0.88rem; font-weight: 500; cursor: pointer; transition: background 0.2s, color 0.2s; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); }
+        .admin-page-btn:hover:not(:disabled) { background: rgba(255,255,255,0.12); color: #fff; }
+        .admin-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .admin-page-btn.current { background: #7c6af5; color: #fff; }
+        .admin-page-btn.current:hover { background: #8f7ef7; }
+        .admin-page-ellipsis { min-width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.88rem; color: rgba(255,255,255,0.4); }
       `}</style>
 
       <div className="admin-root">
@@ -568,6 +608,32 @@ export default function AdminPage() {
                   />
                 </div>
               </div>
+
+              <div className="admin-count-bar">
+                <span className="admin-count-text">
+                  Tổng: <strong>{totalCount}</strong> khách hàng
+                </span>
+                <div className="admin-batch-wrap">
+                  <label htmlFor="admin-batch-select">Hiển thị:</label>
+                  <select
+                    id="admin-batch-select"
+                    className="admin-batch-select"
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value) as 10 | 25 | 50 | 100)}
+                    aria-label="Số khách hàng mỗi trang"
+                  >
+                    {BATCH_OPTIONS.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                {totalCount > 0 && (
+                  <span className="admin-showing">
+                    Đang hiển thị {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, totalCount)} trong tổng {totalCount}
+                  </span>
+                )}
+              </div>
+
               <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
@@ -582,7 +648,7 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map((u) => {
+                  {paginatedUsers.map((u) => {
                     const isExpanded = expandedUser === u.username;
                     const access = hasAccessToTools(u);
                     return (
@@ -828,7 +894,63 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
-            {filteredUsers.length === 0 && !loading && (
+
+            {totalPages > 1 && (
+              <nav className="admin-pagination" aria-label="Phân trang">
+                <button
+                  type="button"
+                  className="admin-page-btn"
+                  disabled={safePage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  aria-label="Trang trước"
+                >
+                  ←
+                </button>
+                {(() => {
+                  const pages: (number | "ellipsis")[] = [];
+                  if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    pages.push(1);
+                    if (safePage > 3) pages.push("ellipsis");
+                    const mid = [safePage - 1, safePage, safePage + 1]
+                      .filter((i) => i >= 2 && i <= totalPages - 1)
+                      .sort((a, b) => a - b);
+                    const seen = new Set(pages.filter((x): x is number => typeof x === "number"));
+                    for (const i of mid) { if (!seen.has(i)) { seen.add(i); pages.push(i); } }
+                    if (safePage < totalPages - 2) pages.push("ellipsis");
+                    if (totalPages > 1) pages.push(totalPages);
+                  }
+                  return pages.map((p, i) =>
+                    p === "ellipsis" ? (
+                      <span key={`e-${i}`} className="admin-page-ellipsis">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`admin-page-btn ${p === safePage ? "current" : ""}`}
+                        onClick={() => setCurrentPage(p)}
+                        aria-label={`Trang ${p}`}
+                        aria-current={p === safePage ? "page" : undefined}
+                      >
+                        {p}
+                      </button>
+                    )
+                  );
+                })()}
+                <button
+                  type="button"
+                  className="admin-page-btn"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  aria-label="Trang sau"
+                >
+                  →
+                </button>
+              </nav>
+            )}
+
+            {totalCount === 0 && !loading && (
               <p style={{ color: "rgba(255,255,255,0.5)", marginTop: 16 }}>
                 {searchQuery.trim() ? "Không tìm thấy khách hàng nào." : "Chưa có người dùng."}
               </p>
