@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/users-db";
 import { USER_FEATURES, type UserFeature } from "@/lib/users-types";
-import { createJob, getRemainingByUser, getSpamLoginLimitRemainingMinutes, readJobs } from "@/lib/jobs-db";
+import { createJob, type CreateJobOptions, getRemainingByUser, getSpamLoginLimitRemainingMinutes, readJobs } from "@/lib/jobs-db";
 import { consumeGrant, readServiceGrants, getGrantRemaining } from "@/lib/service-grants-db";
 
 /** POST /api/jobs/start - start a job for the current user. Body: { feature }. Header: X-Username. */
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Tính năng không hợp lệ." }, { status: 400 });
   }
 
-  let options: { spamLoginDays?: number; spamLoginDurationMinutes?: number; meta?: { bannerUrl?: string; accessToken?: string } } | undefined;
+  let options: CreateJobOptions | undefined;
   if (feature === "spam_login") {
     if (typeof body.spamLoginDurationMinutes === "number") {
       options = { spamLoginDurationMinutes: body.spamLoginDurationMinutes };
